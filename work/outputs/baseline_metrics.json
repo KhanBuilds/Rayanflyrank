@@ -1,0 +1,13 @@
+{
+  "base_rate": 0.5421,
+  "evaluation": "full-data, in-sample (thresholds read off w02 crosstabs) - not a held-out estimate",
+  "positives": 16262,
+  "precision_at_100": 0.8,
+  "precision_at_20": 0.75,
+  "precision_at_200": 0.835,
+  "precision_at_50": 0.74,
+  "precision_at_500": 0.808,
+  "random_state": 42,
+  "rows_scored": 30000,
+  "rule": "3*established_coverage + 2*has_demand + 2*mid_position + 1*stale_90d + 1*mature_page"
+}
