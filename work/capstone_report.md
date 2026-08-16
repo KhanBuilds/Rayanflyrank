@@ -5,30 +5,41 @@
 - **Repo:** https://github.com/KhanBuilds/Rayanflyrank
 - **Date:** 2026-07-30
 
-> **Status of this draft.** Sections 0–3 and 6–8 are filled from work that has been run and verified:
+> **Status of this draft.** Every section is filled from work that has been run and verified:
 > `w01_research_question.ipynb` (ML-02), `w02_ml_task_framing.ipynb` (ML-03),
 > `w03_data_contract.ipynb` (ML-04), `w03_feature_leakage_check.ipynb` (ML-05),
-> `w04_signal_audit.ipynb` (ML-06), `w04_baseline_score.ipynb` (ML-07) and `capstone.ipynb` (ML-11/12).
-> **Sections 4 and 5 are PENDING ML-08/ML-09** — no model has been trained. Where a number comes from
-> the repo's bundled reference pipeline (`outputs/model_report.md`) rather than my own run, it is labelled
-> as such: a bar to clear, never a result I claim.
+> `w04_signal_audit.ipynb` (ML-06), `w04_baseline_score.ipynb` (ML-07), `w05_model.ipynb` (ML-08),
+> `w06_validation_audit.ipynb` (ML-09), `w07_action_playbook.ipynb` (ML-10) and `capstone.ipynb`
+> (ML-11/12). Every notebook was executed top to bottom through a Jupyter kernel and ships with its
+> outputs stored. Where a number comes from the repo's bundled reference pipeline
+> (`outputs/model_report.md`) rather than my own run, it is labelled as such: a bar to clear, never a
+> result I claim.
 
 ## 0. Abstract
-
-**Draft — to be rewritten once Sections 4 and 5 hold real numbers.**
 
 Among mature indexed content items with established search demand, which pages are undergoing measured
 organic decline and should be prioritised for editorial review in the coming sprint? The work uses the
 FlyRank internship starter dataset — 30,000 pseudonymized content items across 32 clients, one trailing
 90-day window. I framed the task as capacity-constrained **ranking** (not classification), committed to
 precision@50 against the 54.2% base rate before building anything, and built a transparent five-condition
-rule baseline with reason codes on every row. That baseline reaches **precision@50 = 0.740 against a
-0.542 base rate** in-sample — 37 of 50 review slots landing on pages measured as declining, versus 27 for
-random triage — and its two documented defects (a label exactly reconstructible from two impression
-columns, and precision that *rises* with K because the top of the ranking is mis-ordered) are the
-substantive findings so far; the learned model that should fix the ordering is **not yet trained**. The
-output is a ranked review queue: a decision-support aid telling an editor which pages to open first, not
-a prediction that refreshing them recovers traffic.
+rule baseline with reason codes on every row. That baseline reaches **precision@50 = 0.740** in-sample and
+carries a specific, self-diagnosed defect: its precision *rises* with K, meaning it finds a good band of
+candidates but orders that band backwards at the top, where the queue is actually read.
+
+Four models were then trained and compared on a **client-held-out split** (GroupKFold, 32 clients, zero
+overlap), with the baseline scored on identical rows. The shipped system is a **hybrid**: the rule selects
+the band and supplies the reason codes, a logistic regression orders pages within it. It reaches
+**precision@50 = 0.900 against a 0.542 base rate** — 45 of 50 review slots landing on pages measured as
+declining, versus 27 for random triage — and it is the only candidate whose precision falls monotonically
+from **1.000 at K=10**, i.e. the only one that fixes the ordering defect it was built to fix.
+
+Three results run against the headline and are reported with it. A random row split inflates AUC by
+**0.152** over the grouped split — pure client memorisation, and the easiest way to publish a wrong number
+on this data. The model's top feature by a factor of 2.4 is **impressions volume**, so it is substantially
+ranking by measurable exposure rather than by decay. And its remaining errors are the *same* errors the
+rule made: four of the five misses in its top 50 are pages that grew. The output is a ranked review queue —
+a decision-support aid telling an editor which pages to open first, not a prediction that refreshing them
+recovers traffic.
 
 ## 1. Problem framing
 
@@ -124,9 +135,18 @@ or univariate statistics.**
   grouped by `client_id`.
 
 **Client-identifying data.** Confirmed: no client names, domains, URLs or raw search queries anywhere in
-`work/`. IDs are pseudonyms; the feature matrix contains no text columns at all (asserted: dtypes are
-numeric only); the ML-07 top-20 review withholds identifiers. The ranked-queue CSV stays gitignored
-(`work/**/*.csv`); only metrics JSONs are committed.
+`work/`. IDs are pseudonyms and never enter any model — they are used for grouping, splitting and audit
+only. **No free text of any kind reaches the feature matrix**: the nine non-numeric columns ML-08 uses are
+closed-vocabulary categorical bands (`position_tier`, `content_type`, `age_tier` …) that are one-hot
+encoded, not titles, slugs or query strings. The ML-07 top-20 review and the ML-08 error analysis both
+withhold identifiers — the miss tables print performance columns only. Both ranked-queue CSVs stay
+gitignored (`work/**/*.csv`); only metrics JSONs are committed.
+
+*Consistency, checked mechanically rather than assumed:* a regex sweep for `content_*` / `client_*`
+patterns across the stored cell outputs of **all ten** notebooks returns nothing. `w02_ml_task_framing.ipynb`
+originally printed six pseudonymous IDs in its unit-of-analysis preview; that cell now withholds them
+(`<withheld>`) while still showing the same columns and proving the same grain, so the notebook makes its
+point without breaking the convention the rest of the repo follows.
 
 ## 3. Baseline
 
@@ -183,44 +203,153 @@ order. Beating 0.240 is not the achievement; beating **0.542** is.
 
 ## 4. Model / analysis
 
-**PENDING — ML-08 (`work/notebooks/w05_model.ipynb`).** No model has been trained, and no model number
-appears anywhere in this report. `scikit-learn` is not installed in the environment these notebooks were
-last executed in, which is the blocker.
+**Built and measured (ML-08, `work/notebooks/w05_model.ipynb`).** Receipt:
+`work/outputs/model_metrics.json`.
 
-What is already fixed and does not need re-deciding:
+- **Target:** `is_declining_label` = 1 when `trend_direction == "down"` — impressions fell more than 20%
+  between the most recent 30 days and the 30 before. Base rate 0.5421 (16,262 of 30,000).
+- **Feature matrix:** 38 columns from the 32 contract-approved fields — 29 numeric (including six `has_*`
+  missing indicators) and 9 categorical, one-hot encoded downstream inside the pipeline.
+  `avg_position == 0` recoded to missing before anything else; the heavy-tailed counts `log1p`'d
+  (skew 11–18, per ML-05). No free text, no IDs, no label-derived fields — asserted in code, not claimed
+  in prose.
+  > **Why this says 38 where ML-05 says 68.** Same contract, same fields, different stage of the same
+  > matrix. ML-05 one-hot encoded the categoricals *up front* and reported the post-encoding width (68
+  > all-numeric columns). ML-08 hands the 9 categoricals to a `ColumnTransformer` and lets it encode
+  > **inside the cross-validation loop**, so the pre-encoding width is 38. Encoding inside the fold is the
+  > safer construction — it stops a category that appears only in the test fold from influencing the
+  > encoding — which is why the number changed rather than the contract.
+- **Method:** four candidates, listed in order of readability so that a simple winner would be visible if
+  it happened — logistic regression, a depth-3 decision tree, a random forest, and histogram gradient
+  boosting. Each is used as a **ranking score** (`predict_proba`), never thresholded at 0.5.
+- **No hyperparameter search.** Library defaults plus two conservative variance guards. An untuned model
+  that wins is a cleaner claim than a tuned one that wins by tuning.
 
-- **Target (one sentence):** `is_declining_label` = 1 when `trend_direction == "down"` — impressions fell
-  more than 20% between the most recent 30 days and the 30 before. Base rate 0.5421 (16,262 of 30,000).
-- **Feature matrix:** built and verified in ML-05 — **68 columns** from the 32 contract-approved fields
-  (log1p versions of the heavy-tailed counts, skew 11–18; `avg_position` recoded with a flag; `has_*`
-  indicators on every gap; one-hot categoricals with missing as its own level). No text columns, no IDs,
-  no label-derived fields — all asserted in code.
-- **Method:** a tree-based classifier whose probability is used as a ranking score, because the decision is
-  "which K first" and the signal lives in bands and interactions rather than linear thresholds.
-- **The falsifiable prediction to test:** the baseline's defect is specific — *good band, bad ordering
-  inside it*. A model earns its place here if and only if it improves the ordering **within** the top band,
-  which shows up as precision@20 ≥ precision@50 ≥ precision@100 rather than the inverted curve the rule
-  produces.
+**Results, all out-of-fold on the client-held-out split, base rate 0.542 beside every figure:**
 
-**Known weakness of the proxy, to carry into the paper:** label and features are drawn from the same
-90-day window, so this is **concurrent** decline detection, not forecasting. The honest sentence is "this
-page resembles the pages measured as declining", never "this page will decline".
+| System | p@20 | p@50 | p@100 | p@200 | ROC-AUC |
+|---|---|---|---|---|---|
+| Flag everything (floor) | 0.542 | 0.542 | 0.542 | 0.542 | 0.500 |
+| My rule baseline (ML-07, in-sample) | 0.750 | 0.740 | 0.800 | **0.835** | 0.6485 |
+| Decision tree (depth 3) | 0.600 | 0.600 | 0.570 | 0.600 | 0.6244 |
+| Random forest | 0.550 | 0.680 | 0.740 | 0.780 | 0.6808 |
+| Histogram gradient boosting | 0.900 | 0.820 | 0.790 | 0.800 | **0.6910** |
+| Logistic regression | 0.800 | 0.880 | 0.810 | 0.805 | 0.6774 |
+| **Hybrid — rule band, logistic orders within it (shipped)** | **0.950** | **0.900** | **0.850** | 0.805 | 0.6606 |
+
+**The prediction I committed to in advance was tested and held.** ML-07's defect was specific — *good
+band, bad ordering inside it* — and the falsifiable test recorded before training was that a model earns
+its place only if precision stops rising with K. Measured:
+
+| K | 10 | 20 | 50 | 100 | 200 | 500 |
+|---|---|---|---|---|---|---|
+| ML-07 rule | 0.700 | 0.750 | 0.740 | 0.800 | 0.835 | 0.808 |
+| **Hybrid** | **1.000** | **0.950** | **0.900** | **0.850** | 0.805 | 0.770 |
+
+The rule's curve climbs; the hybrid's falls monotonically. **Only the hybrid passes.** Plain logistic
+regression does not (0.700 at K=10, peaking at K=50), and neither does boosting cleanly.
+
+**Two things I did not expect, reported because they are true:**
+
+1. **The readable model won, and only because of a feature decision.** Logistic regression beat both tree
+   ensembles at precision@50 — but *only* once the count columns were log-transformed. In an earlier run
+   without that step it scored 0.660 and finished last. The honest lesson is not that linear models are
+   underrated; it is that the **ML-05 feature-engineering decision mattered more than the choice of
+   model**, and I would have mis-attributed the result had I skipped it because trees do not need it.
+2. **The rule still wins at K=200** (0.835 vs 0.805) and boosting wins at K=500. If editorial capacity
+   were 200 pages a sprint rather than 50, my recommendation would change. The metric is only correct
+   because the capacity is what it is.
+
+**Known weakness of the proxy, carried into the paper:** label and features are drawn from the same 90-day
+window, so this is **concurrent** decline detection, not forecasting. The honest sentence is "this page
+resembles the pages measured as declining", never "this page will decline".
 
 ## 5. Evaluation
 
-**PENDING — ML-09 (`work/notebooks/w06_validation_audit.ipynb`).** No held-out evaluation has been run,
-and **no sealed-evaluation claim is made anywhere in this report.**
+**Run and measured (ML-08).** Split: **GroupKFold(5) on `client_id`**, zero client overlap between train
+and test — asserted in code for all five folds, not assumed. Seed 42 everywhere.
 
-The split design is already decided and justified by measurement: **grouped by `client_id`**, no client in
-both train and test, because per-client label rates span **0.000–0.937** across 32 clients and the three
-largest hold **43.3%** of rows — a random row split would measure client memorisation. A **time-aware**
-split is impossible from this file (no date column) and needs the warehouse release. Seed 42.
+**Why that split, in one measured number.** The same model on the same features, two splits:
 
-Still required: model vs baseline in one table on that same split with the 0.542 base rate beside every
-figure; and a short error analysis. My stated prior, from the baseline's error pattern: false positives
-will concentrate in **high-impression pages** (where a rising page looks structurally like a declining one
-to a volume-driven score) and in **low-volume pages** (where a −20% threshold on 5 → 3 impressions is
-noise). 19.1% of declining pages have fewer than 100 impressions in 90 days.
+| Split | ROC-AUC | p@50 |
+|---|---|---|
+| Random 80/20 row split | **0.777** | 0.920 |
+| Grouped, clients held out | **0.624** | 0.780 |
+
+**A 0.152 AUC gap of pure client memorisation.** Per-client label rates span 0.000–0.937 across 32
+clients and the three largest hold 43.3% of rows, so a random split mostly measures which client a page
+belongs to. This is the single easiest way to publish an inflated number on this dataset, and it is
+measured here rather than asserted. A **time-aware** split remains impossible from this file (no date
+column) and needs the warehouse release.
+
+**One asymmetry disclosed against my own result.** The rule's thresholds were read off crosstabs computed
+on all 30,000 rows, so it is mildly in-sample everywhere while every model number is strictly out-of-fold.
+**The comparison is tilted toward the baseline, not the model.**
+
+**Uncertainty, because precision@50 is a statement about 50 rows** (one row moves it by 0.02).
+Bootstrapped 95% intervals on the selected set:
+
+| System | p@50 | 95% interval |
+|---|---|---|
+| ML-07 rule | 0.740 | [0.620, 0.860] |
+| Logistic regression | 0.880 | [0.780, 0.960] |
+| Hybrid | 0.900 | [0.820, 0.980] |
+
+The hybrid's interval and the rule's overlap only slightly. On one dataset and one 90-day window I report
+the improvement as **measured and directional, not established**.
+
+**The spread across folds argues the other way, and that is reported too.** precision@50 measured
+*separately inside* each held-out fold:
+
+| System | mean | worst fold |
+|---|---|---|
+| Logistic regression | 0.768 | **0.560** |
+| Random forest | 0.772 | 0.660 |
+| ML-07 rule | 0.784 | 0.680 |
+| **Hybrid (shipped)** | 0.820 | 0.740 |
+| Histogram gradient boosting | **0.828** | **0.780** |
+
+**Two questions, two winners.** Pooled out-of-fold asks *"rank the whole portfolio at once"* — the hybrid
+wins. Per-fold asks *"rank a group of clients this model has never seen"* — boosting wins on both mean and
+floor, and plain logistic regression collapses to 0.560 on one fold, barely above the base rate. Part of
+that gap is a calibration artifact: pooling requires scores comparable *across* fold models, and logistic
+probabilities stack more cleanly than a tree ensemble's. The hybrid is the compromise: second on both
+measures, with the band structure preventing any single fold model's mis-calibration from dragging a page
+into the top 50. **If a future release shows the fold floor mattering more than the pooled top-50, the
+choice should flip to boosting — written down now rather than defended later.**
+
+**My stated prior was wrong in an instructive way.** I predicted false positives would concentrate in
+**high-impression pages** and in **low-volume pages**. Neither is what happened. Four of the hybrid's five
+top-50 misses are pages that *grew* (+23.6% to +93.7%) — the direction I predicted — but they span 84 to
+1,593 impressions, so volume is not the shared trait. **What they share is position: every miss sits at
+`avg_position` 4.1–10.5, i.e. page one.** The model cannot separate a healthy page-1 page from a decaying
+one. That is the same blind spot ML-06 measured from the other direction — `top_3` pages decline *least*
+of any position band (0.241 against a 0.542 base rate) — so strong position is genuinely ambiguous
+evidence in this data, and my prior pointed at the wrong axis.
+
+**Sealed-evaluation claim: still none.** Cross-validation is an honest held-out estimate, not a sealed
+test — every fold's data was available to me while I worked, and I chose the shipped configuration after
+seeing fold results.
+
+**The audit found something I did not plan for (ML-09).** The skill's verification step says to inject a
+known leak and confirm the harness catches it. Adding the two forbidden columns back moves out-of-fold AUC
+from 0.677 to **0.920 as raw counts** — but to **0.9996 in log space**. The same two columns, the same
+model, an 0.08 AUC difference. The reason is that the label is a threshold on a **ratio**, which is linear
+in logs and not in raw counts, so a linear model can only fully exploit the leak when the representation
+matches the label's functional form.
+
+**The general lesson, which I did not know before running it: leakage is a property of *(column,
+representation, model)*, not of a column.** A screen that evaluates columns before deciding how they will
+be transformed can under-state a leak by exactly the margin that gets waved through as "the model is just
+a bit good". It also retrospectively justifies ML-05's method — that audit caught the pair by testing the
+*reconstruction formula* rather than the columns one at a time.
+
+**One check this project cannot fully pass, stated plainly.** The label lives in days 1–60 of the window;
+several features are 90-day aggregates *containing* those days. By the strict rule, they are contaminated.
+Three things stop that being fatal — the overlap is of magnitude not identity (`impressions_90d` alone
+scores AUC 0.585, and a 90-day sum cannot express a direction), the task is framed as concurrent detection
+rather than forecasting, and a clean version needs day-61–90 features that this file cannot produce
+(the 30-day columns tile the 90-day total in only 8.7% of rows). It is disclosed here rather than passed.
 
 ## 6. Interpretation
 
@@ -255,51 +384,154 @@ survived:
 4. **The staleness story barely exists in this slice.** 174 pages beyond 180 days. The industry-standard
    refresh heuristic has nothing to fire on here.
 
-**Feature importances:** PENDING ML-08. Advance note for honesty: the reference pipeline's top features
-(`days_with_impressions`, `log_impressions_90d`, `avg_position`, `content_age_days`) form a
-*volume-and-exposure* profile rather than a decay profile. If my own run reproduces that, the honest
-reading is that the model partly learns "how much measurable traffic this page has" — and that must be
-stated, not dressed up as decline detection.
+**Feature importances (ML-08) — the advance warning was correct, and it lands against my own result.**
+Before training anything I wrote: *"the reference pipeline's top features form a volume-and-exposure
+profile rather than a decay profile; if my own run reproduces that, the honest reading is that the model
+partly learns how much measurable traffic this page has."* Permutation importance, averaged over the five
+held-out folds (ROC-AUC drop when the column is shuffled):
+
+| Feature | AUC drop |
+|---|---|
+| `impressions_90d` (log) | **0.119** |
+| `clicks_90d` (log) | 0.050 |
+| `sessions_90d` / `users_90d` (log) | 0.033 / 0.032 |
+| `avg_position` | 0.028 |
+
+**It reproduced.** Volume outranks the next feature by 2.4×, and the only non-volume feature near the top
+is position. The model is substantially ranking pages by how much measurable search exposure they carry,
+and only secondarily by anything resembling decay — stated here rather than dressed up as decline
+detection. It also sets up the error pattern in Section 5: a system whose two strongest signals are
+*exposure* and *position* has no way to tell a well-performing page-1 page from a decaying one, and that
+is exactly where its top-50 misses land.
+
+**Why the coefficients are not interpreted one at a time.** The fitted logistic model carries +1.18 on
+`impressions_90d` while carrying −0.62 on `clicks_90d` and −0.59 on `users_90d` (standardized inputs).
+Those columns are strongly collinear — ML-05 named this risk in advance — so the fit has split one signal
+across several columns and **the sign of any single coefficient is not a statement about the world**. Read
+as a group they suggest *high impressions relative to clicks and sessions*, an exposed page not converting
+its exposure. That reading is a hypothesis about the fit, not a measured finding, and it is labelled as
+one rather than promoted to an insight.
+
+**Nothing looks like leakage.** A top feature carrying 0.119 AUC inside a 0.677-AUC model is
+strong-but-ordinary. The alarm would have been a single feature approaching 1.0 — the shape ML-05 measured
+for `trend_pct` (0.753 inverted) before excluding it.
+
+### Applying the same standard to the published research (ML-09)
+
+I audited two findings from *The State of AI-Driven SEO* (March 2026) with the questions I ask of my own
+work. The paper's Methodology page is more careful than most published SEO research — it names its
+confounders, flags its own unstable buckets, and states plainly that the study is observational. Both
+issues below are places where **the paper contradicts either itself or the dataset it shipped with**, so
+both are checkable in code rather than matters of taste.
+
+**1. "Refreshing mature pages produces 3.2× health and 57× impressions" (Finding #4) is causal language on
+an observational comparison — and the paper's own Methodology page forbids it** ("correlations do not
+prove causation"). The mechanism is selection: nobody refreshes pages at random, so part of that 57× is
+*which pages were chosen*. There is also a definitional loop — Health Score is 30 points impressions + 30
+position + 20 CTR + 20 scroll, so **60 of its 100 points are search performance**, and reporting a health
+lift as the effect of refreshing partly restates the input. The fix needs no new data, only different
+words: *"mature pages refreshed in the last 30 days show 57× the impressions of those that were not."*
+
+**2. "Logistic regression (71% holdout accuracy)" (ML Appendix) is reported with no base rate, on an 80/20
+split across 57 brands.** A majority-class classifier on the paper's own counts scores **62.1%** for free,
+so 71% is roughly **9 points of skill**. And the split is ungrouped — which is the objection I can price
+precisely, because I ran the identical experiment: on this data, a random split versus a client-grouped
+split is worth **0.152 AUC**. My genuine skill above chance is 0.124. **The memorisation available from an
+ungrouped split is larger than the signal.**
+
+**3. The paper and its own dataset disagree on the definition of the variable both findings rest on.** Page
+5 defines Trend Direction as ±10%; the shipped data dictionary says ±20%. **The data follows ±20%** —
+verified by reading the actual `trend_pct` boundaries of each class (`up` starts at exactly +20.0, `down`
+ends at exactly −20.0). A reader rebuilding the cohorts at ±10% would reclassify **1,935 rows in this
+30,000-row slice alone** and would not know why their reproduction failed. That is a one-line errata, not
+an analysis error, but it sits on the paper's central variable.
+
+**What I could not fault.** The paper flags its own 283:1 outlier as unstable ("283 growing pages versus
+only 1 declining") against its own headline, labels the ML appendix exploratory and secondary, and states
+that no p-values or confidence intervals are reported. Where it polices itself, it does so voluntarily.
+
+**And the reciprocal test.** The two objections I raised are the two I am most at risk of committing.
+Section 5 is my answer to the split objection, measured on my own model at my own cost; the base rate
+appears beside every precision figure in this report, which is my answer to the other.
 
 ## 7. Recommendation
 
-**The ranked actions the current output supports.** This is the ML-07 baseline queue; the model-ranked
-version is PENDING. Every row is a **review** recommendation — the system never recommends publishing a
-change, only opening a page.
+**The ranked actions the shipped output supports.** The queue is the ML-08 hybrid
+(`work/outputs/model_action_score.csv`): the ML-07 rule selects the band and supplies the reason codes, the
+logistic model orders pages within it. Every row is a **review** recommendation — the system never
+recommends publishing a change, only opening a page.
+
+**All 50 rows of the shipped queue sit at baseline score 9**, meaning all five conditions fired on every
+one of them. So each recommendation still arrives with the same auditable explanation an editor could read
+in ML-07; the model changed only the order, which is precisely the part the rule was measured to get wrong.
 
 | Reason-code pattern | Action | Confidence | Limit |
 |---|---|---|---|
-| All five codes, mid-size page | **Refresh review** | Medium-high (~71% of this band measured declining) | Off-season intent looks identical; no seasonality field exists to rule it out |
-| All five codes, **largest pages in the band** | **Monitor only** | Low — measured counter-signal | The three biggest pages in my top band all grew (+35% to +69%) |
+| All five codes, model-ranked top 50 | **Refresh review** | Medium-high — 45 of 50 measured declining (0.900 vs 0.542 base rate) | Off-season intent looks identical; no seasonality field exists to rule it out |
+| All five codes, **page-1 position** (`avg_position` < 11) | **Refresh review, but verify direction first** | Medium — this is where every measured error sits | 4 of the 5 misses in the top 50 are page-1 pages that *grew* (+23.6% to +93.7%) |
+| Any `comparison article` | **Do not trust the rank** | None — measured AUC 0.524, i.e. chance | 697 pages the model cannot order at all |
 | `established_coverage` + `has_demand`, no `stale_90d` | Monitor | Low-medium | Recently updated; a second refresh is unlikely to be the lever |
 | Missing `mid_position` (top-3, or no position data) | Deprioritise | Medium | `top_3` declines least (0.241); `avg_position == 0` means no reading at all |
 | `no_signal` | Leave alone | — | 75 pages, declining rate 0.293 — below the base rate |
 
+**The operational playbook (ML-10) turns each measured failure mode into a guardrail.** Applied to the top
+50, the rules produce a sendable set of **27 pages**: 23 deferred by the per-client cap, and every page-1
+row flagged for a direction check first. The cap cuts the largest client's share of the sprint from
+**58% to 30%**. Full working and the monitoring plan: `work/notebooks/w07_action_playbook.ipynb`; receipt:
+`work/outputs/playbook_metrics.json`.
+
+**The filtered set measures 0.926 declining — and that number is not model performance.** It is what a
+human decision layered on the ranking produced, and the playbook reports it beside the raw 0.900 precisely
+so the two can never be conflated. **The rules remove slots; they do not remove errors.**
+
 **How an editor would use it tomorrow:**
 
-1. Take the top 50 rows of `work/outputs/baseline_action_score.csv`.
-2. **Move ranks 1–3 (top decile of impressions within the band) to a monitor list** — that is where the
-   measured false positives concentrate.
-3. **Cap at ~8 pages per client.** Unfiltered, the top 50 spans only **8 of 32 clients** with one client
-   supplying **44%** of the queue; an editor serving the whole book would ignore three quarters of it.
-   This is a product decision the metric cannot see.
-4. Review the remainder by hand — the reason codes say what to look at first.
-5. **Log every decision (refreshed / skipped / monitored) with a date.** That log is the observed outcome
-   this project currently lacks, and it is what would make a genuine past→future label possible next
-   quarter.
+1. Take the top 50 rows of `work/outputs/refresh_queue.csv` (ranked by `hybrid_score`, `action` column
+   already applied).
+2. **Sanity-check the page-1 rows before assigning them.** Every measured false positive in the top 50
+   sits at `avg_position` 4.1–10.5 and is *growing*, not shrinking. Strong position is ambiguous evidence
+   in this data (ML-06: `top_3` declines least of any band), and this is the failure mode that survived
+   from ML-07 into ML-08.
+3. **Cap at ~8 pages per client.** This matters *more* for the shipped queue than for the rule: the
+   hybrid's top 50 spans **7 of 32 clients with one supplying 58%** (29 of 50 slots), against the rule's
+   44%. Better ranking, worse portfolio coverage. A product decision the metric cannot see.
+4. **Drop `comparison article` rows from the queue entirely** until there is a model that can rank them.
+5. Review the remainder by hand — the reason codes say what to look at first.
+6. **Log every decision (refreshed / skipped / monitored) with a date.** That log is the observed outcome
+   this project lacks, and it is what would make a genuine past→future label possible next quarter.
+
+**What would tell us this has gone stale (ML-10 monitoring plan).** Each trigger carries a reference value
+measured from this build, so drift is a comparison rather than a feeling. Tier 1, every sprint: base rate
+outside 0.45–0.65; realised precision@50 below **0.70** (the usefulness floor committed to in ML-03 before
+anything was built) for two consecutive sprints; the largest client exceeding 40% of the sendable set,
+meaning the cap has stopped working. Tier 3, immediate refit: **any change to the ±20% label threshold** —
+not hypothetical, since ML-09 found FlyRank's own research paper documenting that same field as ±10% — and
+**any new client onboarded**, whose queue should be withheld until there is history, because the measured
+cost of an unseen client is 0.152 AUC.
+
+**The whole plan is blocked on one thing that does not exist.** Every Tier-1 trigger except the base rate
+needs to know what the editor actually did. The cheapest high-value change to this project is a
+three-column log: `content_id`, `decision`, `date`. It is also the only route to the causal question this
+work cannot currently answer.
 
 **Confidence and limits, stated plainly.** Directional and decision-support. The queue is measurably
-better than random triage on the metric that matches the decision (0.740 vs 0.542 at K=50) — in-sample, on
-one 90-day snapshot of 32 pseudonymized clients. It is **not** validated out-of-sample, it is **not** a
-forecast, and it does **not** establish that refreshing anything recovers traffic. Nothing here models
+better than random triage on the metric that matches the decision (**0.900 vs 0.542 at K=50**, evaluated
+out-of-fold on held-out clients) — on one 90-day snapshot of 32 pseudonymized clients, with a bootstrap
+interval of [0.820, 0.980] that only just clears the baseline's. It is **not** a sealed evaluation, **not**
+a forecast, and it does **not** establish that refreshing anything recovers traffic. Nothing here models
 search-engine behaviour, and nothing here reads editorial quality.
 
 ## 8. Reproducibility
 
-**Environment and seeds.** `RANDOM_STATE = 42` in every notebook (and `scripts/03_train_model.py:38`).
-Dependencies are `requirements.txt`; the runs behind this report used pandas 2.x, numpy 2.x and matplotlib
-3.10.8. **`scikit-learn` is listed in `requirements.txt` but was not installed in the execution
-environment**, which is exactly why Sections 4 and 5 are PENDING rather than filled.
+**Environment and seeds.** `RANDOM_STATE = 42` in every notebook (and `scripts/03_train_model.py:38`) —
+split, every model, and the bootstrap. Dependencies are `requirements.txt`; the ML-08 run behind Sections
+4–6 used **scikit-learn 1.9.0, pandas 3.0.1, numpy 2.4.0** (printed by the notebook's setup cell). Every
+estimator is `clone()`d per fold, so no fitted state is shared between folds — worth stating because
+`sklearn.pipeline.Pipeline` does *not* clone its final estimator, and reusing one silently produces a
+model fitted on the wrong fold.
+
+**A version caveat that belongs next to the headline.** Tree-ensemble precision@K can move a point or two
+between library versions. **The direction of the precision curve is the finding, not the third decimal.**
 
 **From a fresh clone:**
 
@@ -314,8 +546,16 @@ pip install -r requirements.txt
 #   work/notebooks/w03_feature_leakage_check.ipynb  (ML-05, optional stretch)
 #   work/notebooks/w04_signal_audit.ipynb           (ML-06, optional stretch)
 #   work/notebooks/w04_baseline_score.ipynb         (ML-07)  -> writes work/outputs/
+#   work/notebooks/w05_model.ipynb                  (ML-08)  -> writes work/outputs/model_*
+#   work/notebooks/w06_validation_audit.ipynb       (ML-09)
+#   work/notebooks/w07_action_playbook.ipynb        (ML-10)  -> writes refresh_queue + playbook_metrics
 #   work/notebooks/capstone.ipynb                   (ML-11/12) -> writes work/figures/
 ```
+
+`w05_model.ipynb` takes roughly **8–10 minutes** to run end to end (five folds × four models, plus
+permutation importance over all five folds). It **asserts the rebuilt ML-07 rule matches the committed
+`baseline_metrics.json`** before comparing anything, so a stale baseline fails loudly instead of quietly
+flattering the model.
 
 Every notebook is **self-contained and order-independent**: each has a setup cell that resolves the repo
 root (on Colab it shallow-clones the repo and installs requirements; locally it walks up from the kernel's
@@ -324,22 +564,43 @@ start directory until it finds `data/raw`), then loads the starter CSV from
 baseline inline rather than depending on another notebook having been run, and then **asserts its numbers
 match the committed receipt**, so a stale artifact fails loudly instead of silently.
 
-**Verification status (2026-07-30).** All seven notebooks above were executed top to bottom with no
-errors, and every number quoted in this report is reproduced by the cell outputs. They were executed as
-extracted cell sequences (in order, shared namespace) rather than through a Jupyter kernel —
-`jupyter`/`nbformat` are not installed locally — so the committed notebooks carry no stored outputs for
-cells written in that pass. **Run all in Colab before submitting** so the notebooks ship with visible
-outputs.
+**Verification status (2026-08-16).** All ten notebooks above were executed top to bottom with no errors,
+and every number quoted in this report is reproduced by a stored cell output. **`w05_model.ipynb` (ML-08),
+`w06_validation_audit.ipynb` (ML-09), `w07_action_playbook.ipynb` (ML-10) and `capstone.ipynb` were
+executed through a real Jupyter kernel via `nbconvert --execute`, so they ship with their outputs stored in
+the file** — the comparison table, the fold spread, the leak-injection test and the error analysis are all
+readable without running anything.
 
-**Receipts.** `work/outputs/baseline_metrics.json` is committed and carries every precision@K in Section
-3, plus its own honesty note in the `evaluation` field. `work/figures/*.svg` holds the two figures the
-paper embeds. The ranked-queue CSV (`work/outputs/baseline_action_score.csv`, 30,000 rows) is
-**deliberately gitignored** — `git check-ignore` confirms `work/**/*.csv` catches it — because datasets
-never enter git; the metrics JSON is the committed trace instead.
+**All ten notebooks have since been executed the same way**, so every one of them carries stored outputs
+and an `execution_count` sequence of exactly 1..N — which is how a reader can tell each was a single clean
+top-to-bottom pass rather than a patchwork of cells run out of order. Verified mechanically across the set,
+along with: zero cell errors, zero `TODO`/`PENDING` markers, and zero pseudonymous IDs in any stored
+output.
 
-**Sealed/holdout claim: none made.** No cell in this repo builds a sealed frame, and no metrics file
-claims a blind evaluation. When ML-09 produces one, both the building cell and the metrics file it wrote
-get committed, so "evaluated once, blind" is checkable from the repo rather than taken on faith.
+**Receipts.** Three committed metrics files, and every number in this report traces to one of them:
+
+- `work/outputs/baseline_metrics.json` — every precision@K in Section 3, plus its own honesty note in the
+  `evaluation` field.
+- `work/outputs/model_metrics.json` — every model number in Sections 4–6: the full comparison table, the
+  per-fold spread, the permutation importances, the random-vs-grouped split inflation, the top-50 client
+  concentration, and a `known_failure_mode` field recording that 4 of 5 top-50 misses are growing pages.
+- `work/outputs/playbook_metrics.json` — the operational layer in Section 7: the rules and their
+  parameters, the resulting sprint composition, and every monitoring reference value with its trigger.
+
+Each downstream notebook **asserts its numbers against the receipt upstream of it** rather than quoting
+them — `capstone.ipynb` and `w07` both refit the shipped ranking and fail loudly if they disagree with
+`model_metrics.json`. A stale artifact breaks the run instead of quietly flattering the report.
+
+`work/figures/*.svg` holds the four figures the paper embeds. All three ranked-queue CSVs
+(`baseline_action_score.csv`, `model_action_score.csv`, `refresh_queue.csv`, 30,000 rows each) are
+**deliberately gitignored** — `git check-ignore` confirms `work/**/*.csv` catches them — because datasets
+never enter git; the metrics JSONs are the committed trace instead.
+
+**Sealed/holdout claim: none made.** Cross-validation on held-out clients is an honest out-of-sample
+estimate, **not** a sealed test: every fold's data was visible to me while working, and I selected the
+shipped configuration after seeing fold results. No cell in this repo builds a sealed frame and no metrics
+file claims a blind evaluation. When ML-09 produces one, both the building cell and the metrics file it
+writes get committed, so "evaluated once, blind" stays checkable from the repo rather than taken on faith.
 
 ## 9. Acknowledgments & data credit
 
@@ -348,11 +609,16 @@ team for the pseudonymized data release and the lane framing.
 
 ---
 
-> **Claims checklist status.** All statements are *observed* / *measured* / *decision-support*. No causal
-> claims — the dataset records no intervention. No "predicted Google's algorithm" — I modelled observable
-> performance metrics in one pseudonymized portfolio. No client-identifying details. The base rate
-> (0.5421) sits beside every precision figure. Small buckets are reported with their n (n=17 stale-visible
-> pages, n=174 at 181+ days freshness, n=3 in the engagement band I refuse to quote as a rate). The
+> **Claims checklist status.** All statements are *observed* / *measured* / *directional* /
+> *decision-support*. No causal claims — the dataset records no intervention. No "predicted Google's
+> algorithm" — I modelled observable performance metrics in one pseudonymized portfolio. No
+> client-identifying details. The base rate (0.5421) sits beside every precision figure. Small buckets are
+> reported with their n (n=17 stale-visible pages, n=174 at 181+ days freshness, n=697 comparison articles
+> the model cannot rank, n=3 in the engagement band I refuse to quote as a rate). Uncertainty is quoted
+> where the sample is small: precision@50 rests on 50 rows and carries a bootstrap interval. The
 > reference-pipeline numbers (0.240 / 0.740 / AUC 0.750) are labelled as the repo's bundled results, not
-> mine. Sections 4 and 5 say PENDING rather than borrowing a number, and no sealed-evaluation claim is
-> made.
+> mine. **No sealed-evaluation claim is made** — cross-validation is not a sealed test, and Section 5 says
+> so. Three results that run against my own headline are reported *with* it rather than after it: the
+> 0.152 AUC of client memorisation a random split would have handed me, the volume-not-decay importance
+> profile I flagged as a risk before training and then reproduced, and the fact that the shipped queue has
+> **worse** portfolio coverage than the baseline it replaces.

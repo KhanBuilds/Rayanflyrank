@@ -1,0 +1,93 @@
+{
+  "base_rate": 0.5421,
+  "blocked_on": "a decision log (content_id | decision | date | reason). Every Tier-1 trigger except the base rate needs it, and it is the only route to a causal claim.",
+  "capacity_per_sprint": 50,
+  "monitoring": {
+    "content_type_mix": {
+      "reference": {
+        "comparison article": 0.0232,
+        "feedly article": 0.0699,
+        "keyword article": 0.9069
+      },
+      "tier": 2,
+      "trigger": "any type moves >10 percentage points",
+      "why": "per-type skill differs enormously (AUC 0.524 to 0.843)"
+    },
+    "label_base_rate": {
+      "reference": 0.5421,
+      "tier": 1,
+      "trigger": "outside 0.45-0.65",
+      "why": "every precision figure is quoted against this"
+    },
+    "label_definition": {
+      "reference": "trend_direction = +/-20% on the 30d impression pair",
+      "tier": 3,
+      "trigger": "ANY change to the threshold -> immediate refit",
+      "why": "ML-09 found the research paper documenting this same field as +/-10%"
+    },
+    "new_client": {
+      "reference": "measured cost of an unseen client = 0.152 AUC",
+      "tier": 3,
+      "trigger": "any client onboarded -> withhold queue until history exists",
+      "why": "an unseen client gets the model's weakest output"
+    },
+    "per_client_auc_min": {
+      "reference": 0.5064,
+      "tier": 2,
+      "trigger": "any client >=200 pages below 0.55 -> withhold that queue",
+      "why": "portfolio-wide AUC hides per-client failure"
+    },
+    "precision_at_50": {
+      "reference": 0.9,
+      "tier": 1,
+      "trigger": "realised < 0.70 for two consecutive sprints",
+      "why": "0.70 is the ML-03 usefulness floor, committed before building"
+    },
+    "queue_concentration": {
+      "reference": {
+        "after_cap": 0.2963,
+        "before_cap": 0.58
+      },
+      "tier": 1,
+      "trigger": "largest client > 0.40 of the SENDABLE set (i.e. the cap stopped working)",
+      "why": "the raw ranking concentrates at 0.58; the cap is the only thing holding it down"
+    },
+    "top_feature": {
+      "reference": [
+        "impressions_90d",
+        0.1185
+      ],
+      "tier": 2,
+      "trigger": "a different feature takes the top slot",
+      "why": "the ranking's basis changed; re-read the error analysis"
+    }
+  },
+  "operational_rules": {
+    "min_client_pages": 200,
+    "per_client_cap": 8,
+    "removed_content_types": [
+      "comparison article"
+    ],
+    "verify_direction_below_position": 11
+  },
+  "random_state": 42,
+  "ranking": "hybrid_rule_band_plus_logistic",
+  "ranking_precision_at_50": 0.9,
+  "sendable": {
+    "clients": 7,
+    "declining_rate": 0.9259,
+    "largest_client_share": 0.2963,
+    "note": "a product decision layered on the ranking - NOT model performance",
+    "pages": 27
+  },
+  "sprint_composition": {
+    "deferred_client_cap": 23,
+    "refresh_review": 5,
+    "refresh_review_verify_direction": 22
+  },
+  "versions": {
+    "numpy": "2.4.0",
+    "pandas": "3.0.1",
+    "scikit-learn": "1.9.0"
+  }
+}
