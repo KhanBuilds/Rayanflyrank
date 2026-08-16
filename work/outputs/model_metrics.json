@@ -1,0 +1,134 @@
+{
+  "base_rate": 0.5421,
+  "baseline_caveat": "the ML-07 rule's thresholds were read off all 30,000 rows, so the comparison is tilted toward the baseline, not the model",
+  "best_single_model": "logistic_regression",
+  "evaluation": "pooled out-of-fold: every row scored by a fold-model blind to its client",
+  "known_failure_mode": "4 of 5 top-50 misses are growing pages - same failure mode as the ML-07 tie-break",
+  "per_fold_precision_at_50": {
+    "baseline_rule": [
+      0.72,
+      0.78,
+      0.78,
+      0.96,
+      0.68
+    ],
+    "decision_tree_d3": [
+      0.5,
+      0.6,
+      0.58,
+      0.72,
+      0.7
+    ],
+    "hist_gradient_boost": [
+      0.92,
+      0.78,
+      0.78,
+      0.86,
+      0.8
+    ],
+    "hybrid": [
+      0.84,
+      0.92,
+      0.74,
+      0.84,
+      0.76
+    ],
+    "logistic_regression": [
+      0.82,
+      0.84,
+      0.56,
+      0.74,
+      0.88
+    ],
+    "random_forest": [
+      0.78,
+      0.92,
+      0.84,
+      0.66,
+      0.66
+    ]
+  },
+  "random_state": 42,
+  "shipped": "hybrid_rule_band_plus_logistic",
+  "split": "GroupKFold(5) on client_id - zero client overlap, asserted",
+  "split_inflation_check": {
+    "grouped_client_split_auc": 0.6244,
+    "note": "0.15 AUC of client memorisation - see Section 2",
+    "random_row_split_auc": 0.7765
+  },
+  "systems": {
+    "baseline_rule": {
+      "p@100": 0.8,
+      "p@20": 0.75,
+      "p@200": 0.835,
+      "p@50": 0.74,
+      "p@500": 0.808,
+      "roc_auc": 0.6485
+    },
+    "decision_tree_d3": {
+      "p@100": 0.57,
+      "p@20": 0.6,
+      "p@200": 0.6,
+      "p@50": 0.6,
+      "p@500": 0.6,
+      "roc_auc": 0.6244
+    },
+    "flag_everything_floor": {
+      "p@100": 0.5421,
+      "p@20": 0.5421,
+      "p@200": 0.5421,
+      "p@50": 0.5421,
+      "p@500": 0.5421,
+      "roc_auc": 0.5
+    },
+    "hist_gradient_boost": {
+      "p@100": 0.79,
+      "p@20": 0.9,
+      "p@200": 0.8,
+      "p@50": 0.82,
+      "p@500": 0.812,
+      "roc_auc": 0.691
+    },
+    "hybrid_rule_band_plus_logistic": {
+      "p@100": 0.85,
+      "p@20": 0.95,
+      "p@200": 0.805,
+      "p@50": 0.9,
+      "p@500": 0.77,
+      "roc_auc": 0.6606
+    },
+    "logistic_regression": {
+      "p@100": 0.81,
+      "p@20": 0.8,
+      "p@200": 0.805,
+      "p@50": 0.88,
+      "p@500": 0.782,
+      "roc_auc": 0.6774
+    },
+    "random_forest": {
+      "p@100": 0.74,
+      "p@20": 0.55,
+      "p@200": 0.78,
+      "p@50": 0.68,
+      "p@500": 0.76,
+      "roc_auc": 0.6808
+    }
+  },
+  "top50_client_concentration": {
+    "distinct_clients": 7,
+    "largest_client_share": 0.58,
+    "note": "worse than the ML-07 rule's 0.44 - a per-client cap is required (ML-10)"
+  },
+  "top_features_permutation_auc_drop": {
+    "avg_position": 0.0281,
+    "clicks_90d": 0.0503,
+    "impressions_90d": 0.1185,
+    "sessions_90d": 0.0327,
+    "users_90d": 0.0323
+  },
+  "versions": {
+    "numpy": "2.4.0",
+    "pandas": "3.0.1",
+    "scikit-learn": "1.9.0"
+  }
+}
