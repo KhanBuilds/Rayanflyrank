@@ -184,6 +184,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
     <li><a href="#recommend">Ranked recommendations</a></li>
     <li><a href="#repro">Reproducibility</a></li>
     <li><a href="#credit">Acknowledgments &amp; data credit</a></li>
+    <li><a href="#card">Appendix: model card</a></li>
   </ol>
 </nav>
 
@@ -527,6 +528,32 @@ pip install -r requirements.txt</code></pre>
 <h2 id="credit"><span class="num">9.</span>Acknowledgments &amp; data credit</h2>
 
 <p>Built on the <strong>FlyRank ML Internship dataset</strong> &mdash; <a href="https://flyrank.ai" target="_blank" rel="noopener noreferrer">flyrank.ai</a>. Thanks to the FlyRank team for the pseudonymized data release and the lane framing, and for shipping a data dictionary honest enough that the two places it disagrees with its own file were findable.</p>
+
+<h2 id="card"><span class="num">A.</span>Appendix &mdash; model card</h2>
+
+<p>The one-page version, for a reader who will not read the nine sections above: what this is, what it
+is for, and where it breaks.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Field</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td><strong>System</strong></td><td>Refresh review queue &mdash; hybrid ranking (ML-07 rule selects the band and supplies reason codes; logistic regression orders within it). Combined by <code>band &times; 1000 + probability &times; 100</code>, so the band dominates.</td></tr>
+<tr><td><strong>Version / date</strong></td><td>Capstone build, seed 42, analysis run 2026-08-16. scikit-learn 1.9.0, pandas 3.0.1, numpy 2.4.0.</td></tr>
+<tr><td><strong>What it outputs</strong></td><td>A score per content item, delivered as a ranked queue with reason codes, a suggested action, and a confidence label on every row.</td></tr>
+<tr><td><strong>Intended use</strong></td><td>Decision support for a content strategist choosing which ~50 pages to <em>open and review</em> in a sprint. A human reads every row before anything is edited.</td></tr>
+<tr><td><strong>Out of scope</strong></td><td>Not a forecast. Not a causal estimate of refresh impact. Not an automatic publishing decision. Does not model search-engine behaviour and does not read editorial quality.</td></tr>
+<tr><td><strong>Training data</strong></td><td>FlyRank starter release, <code>data/raw/content_refresh_anonymized.csv</code> &mdash; 30,000 pseudonymized content items, 32 clients, one trailing 90-day window. 32 contract-approved feature fields; 12 excluded, including the four that reconstruct the label.</td></tr>
+<tr><td><strong>Label</strong></td><td><code>trend_direction == "down"</code> &mdash; impressions fell &gt;20% between the most recent 30 days and the 30 before. Base rate <strong>0.5421</strong>. Concurrent with the features, so this is detection, not prediction.</td></tr>
+<tr><td><strong>Validation</strong></td><td><code>GroupKFold(5)</code> on <code>client_id</code>, zero client overlap, asserted per fold. A random row split would have inflated AUC by <strong>0.152</strong>.</td></tr>
+<tr><td><strong>Headline performance</strong></td><td><strong>precision@50 = 0.900</strong> against a <strong>0.542</strong> base rate (1.66&times;) &mdash; 45 of 50 slots on pages measured as declining, versus 27 for random triage. 95% bootstrap interval [0.820, 0.980].</td></tr>
+<tr><td><strong>Known failure modes</strong></td><td>(1) Every measured top-50 error is a <strong>page-1 page that grew</strong> (<code>avg_position</code> 4.1&ndash;10.5). (2) <code>comparison article</code> rows are unrankable &mdash; measured AUC 0.524 across 697 pages. (3) Queue concentration: the top 50 spans 7 of 32 clients with one supplying 58%. (4) Ranks substantially by <em>exposure</em> &mdash; <code>impressions_90d</code> carries 2.4&times; the next feature's importance.</td></tr>
+<tr><td><strong>Required guardrails</strong></td><td>Verify direction on page-1 rows before assigning; cap ~8 pages per client; drop <code>comparison article</code> rows; log every decision with a date.</td></tr>
+<tr><td><strong>Retire / refit triggers</strong></td><td>Base rate outside 0.45&ndash;0.65; realised precision@50 below 0.70 for two consecutive sprints; largest client above 40% of the sendable set; <em>any</em> change to the &plusmn;20% label threshold; any newly onboarded client (withhold its queue until history exists).</td></tr>
+<tr><td><strong>Evaluation status</strong></td><td><strong>No sealed test.</strong> Cross-validation on held-out clients is an honest out-of-sample estimate, not a blind one &mdash; the shipped configuration was chosen after seeing fold results.</td></tr>
+</tbody>
+</table>
+</div>
 
 <footer>
   <p><strong>Claims standard applied throughout.</strong> Every statement on this page is <em>observed</em>, <em>measured</em>, <em>directional</em>, or <em>decision-support</em>. No causal claims &mdash; the dataset records no intervention. Nothing here models search-engine behaviour, and nothing here reads editorial quality. The base rate (0.5421) appears beside every precision figure. Small buckets are reported with their n. Uncertainty is quoted where the sample is small. No sealed-evaluation claim is made. Three results that run against the headline &mdash; the 0.152 AUC of client memorisation, the volume-not-decay importance profile, and the shipped queue's worse portfolio coverage &mdash; are reported <em>with</em> it rather than after it.</p>
