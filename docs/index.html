@@ -162,7 +162,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 
 <section class="abstract">
   <h2>Abstract</h2>
-  <p>Among mature indexed content items with established search demand, which pages are undergoing measured organic decline and should be prioritised for editorial review in the coming sprint? The work uses the FlyRank internship starter dataset &mdash; 30,000 pseudonymized content items across 32 clients, one trailing 90-day window. I framed the task as capacity-constrained <strong>ranking</strong> rather than classification, committed to precision@50 against the 54.2% base rate before building anything, and built a transparent five-condition rule baseline with reason codes on every row; it reaches precision@50 = 0.740 in-sample and carries a self-diagnosed defect &mdash; its precision <em>rises</em> with K, so it finds a good band of candidates but orders that band backwards at the top, where the queue is actually read. Four models were then trained and compared on a client-held-out split (GroupKFold, 32 clients, zero overlap), with the baseline scored on identical rows; the shipped system is a <strong>hybrid</strong> in which the rule selects the band and supplies the reason codes while a logistic regression orders pages within it, reaching <strong>precision@50 = 0.900 against a 0.542 base rate</strong> &mdash; 45 of 50 review slots landing on pages measured as declining, versus 27 for random triage &mdash; and it is the only candidate whose precision falls monotonically from 1.000 at K=10. Three results run against that headline and are reported with it: a random row split inflates AUC by 0.152 over the grouped split (pure client memorisation), the model's top feature by a factor of 2.4 is impressions volume rather than anything resembling decay, and four of its five top-50 misses are pages that <em>grew</em> &mdash; the same failure the rule made. The output is a ranked review queue: decision support telling an editor which pages to open first, <strong>not</strong> a prediction that refreshing them recovers traffic.</p>
+  <p>Among mature indexed content items with established search demand, which pages are undergoing measured organic decline and should be prioritised for editorial review in the coming sprint? The work uses the FlyRank internship starter dataset &mdash; 30,000 pseudonymized content items across 32 clients, one trailing 90-day window. I framed the task as capacity-constrained <strong>ranking</strong> rather than classification, committed to precision@50 against the 54.2% base rate before building anything, and built a transparent five-condition rule baseline with reason codes on every row; it reaches precision@50 = 0.740 in-sample and carries a self-diagnosed defect &mdash; its precision <em>rises</em> with K, so it finds a good band of candidates but orders that band backwards at the top, where the queue is actually read. Four models were then trained and compared on a client-held-out split (GroupKFold, 32 clients, zero overlap), with the baseline scored on identical rows; the shipped system is a <strong>hybrid</strong> in which the rule selects the band and supplies the reason codes while a logistic regression orders pages within it, reaching <strong>precision@50 = 0.900 against a 0.542 base rate</strong> &mdash; 45 of 50 review slots landing on pages measured as declining, versus 27 for random triage &mdash; and it is the only candidate whose precision falls monotonically from 1.000 at K=10. Three results run against that headline and are reported with it &mdash; a random row split inflates AUC by <strong>0.152</strong> over the grouped split (pure client memorisation), the model's top feature by a factor of 2.4 is impressions volume rather than anything resembling decay, and four of its five top-50 misses are pages that <em>grew</em>, the same failure the rule made &mdash; so the output is offered as a ranked review queue and decision-support aid telling an editor which pages to open first, <strong>not</strong> as a prediction that refreshing them recovers traffic.</p>
 </section>
 
 <div class="headline">
@@ -175,7 +175,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 <nav class="toc">
   <b>Contents</b>
   <ol>
-    <li><a href="#problem">The decision this supports</a></li>
+    <li><a href="#problem">Introduction / problem</a></li>
     <li><a href="#data">Data, and what it does not contain</a></li>
     <li><a href="#method">Methodology</a></li>
     <li><a href="#results">Results</a></li>
@@ -187,7 +187,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
   </ol>
 </nav>
 
-<h2 id="problem"><span class="num">1.</span>The decision this supports</h2>
+<h2 id="problem"><span class="num">1.</span>Introduction &mdash; the problem, and the decision it blocks</h2>
 
 <p>A content strategist opens a sprint planning doc on a Monday. The portfolio has 30,000 published pages. Writer hours and optimisation budget cover about <strong>50</strong> of them. The question is not &ldquo;which pages are declining?&rdquo; &mdash; more than half of them are &mdash; it is <strong>which 50 to open first</strong>.</p>
 
@@ -496,18 +496,27 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 
 <pre><code>git clone https://github.com/KhanBuilds/Rayanflyrank
 cd Rayanflyrank
-pip install -r requirements.txt
-# then run, in order:
-#   work/notebooks/w01_research_question.ipynb      (ML-02)
-#   work/notebooks/w02_ml_task_framing.ipynb        (ML-03)
-#   work/notebooks/w03_data_contract.ipynb          (ML-04)
-#   work/notebooks/w03_feature_leakage_check.ipynb  (ML-05)
-#   work/notebooks/w04_signal_audit.ipynb           (ML-06)
-#   work/notebooks/w04_baseline_score.ipynb         (ML-07)
-#   work/notebooks/w05_model.ipynb                  (ML-08)  ~8-10 min
-#   work/notebooks/w06_validation_audit.ipynb       (ML-09)
-#   work/notebooks/w07_action_playbook.ipynb        (ML-10)
-#   work/notebooks/capstone.ipynb                   (ML-11/12)</code></pre>
+pip install -r requirements.txt</code></pre>
+
+<p>Then run the notebooks in order. Each link opens the executed notebook, outputs and all, on GitHub:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>#</th><th>Notebook</th><th>Card</th><th>What it produces</th></tr></thead>
+<tbody>
+<tr><td class="n">1</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w01_research_question.ipynb" target="_blank" rel="noopener noreferrer">w01_research_question</a></td><td>ML-02</td><td>The question and the unit of analysis</td></tr>
+<tr><td class="n">2</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w02_ml_task_framing.ipynb" target="_blank" rel="noopener noreferrer">w02_ml_task_framing</a></td><td>ML-03</td><td>Ranking framing; the 0.70 usefulness floor</td></tr>
+<tr><td class="n">3</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w03_data_contract.ipynb" target="_blank" rel="noopener noreferrer">w03_data_contract</a></td><td>ML-04</td><td>The 32-field contract; the no-date-column assertion</td></tr>
+<tr><td class="n">4</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w03_feature_leakage_check.ipynb" target="_blank" rel="noopener noreferrer">w03_feature_leakage_check</a></td><td>ML-05</td><td>The 1.0000 label reconstruction</td></tr>
+<tr><td class="n">5</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w04_signal_audit.ipynb" target="_blank" rel="noopener noreferrer">w04_signal_audit</a></td><td>ML-06</td><td>Five signals tested; two survive</td></tr>
+<tr><td class="n">6</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w04_baseline_score.ipynb" target="_blank" rel="noopener noreferrer">w04_baseline_score</a></td><td>ML-07</td><td>The rule baseline &rarr; <code>baseline_metrics.json</code></td></tr>
+<tr><td class="n">7</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w05_model.ipynb" target="_blank" rel="noopener noreferrer">w05_model</a></td><td>ML-08</td><td>All models + the split &rarr; <code>model_metrics.json</code> (~8&ndash;10 min)</td></tr>
+<tr><td class="n">8</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w06_validation_audit.ipynb" target="_blank" rel="noopener noreferrer">w06_validation_audit</a></td><td>ML-09</td><td>Leak injection; the published-research audit</td></tr>
+<tr><td class="n">9</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/w07_action_playbook.ipynb" target="_blank" rel="noopener noreferrer">w07_action_playbook</a></td><td>ML-10</td><td>Guardrails + monitoring &rarr; <code>playbook_metrics.json</code>, Figure 4</td></tr>
+<tr><td class="n">10</td><td><a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/notebooks/capstone.ipynb" target="_blank" rel="noopener noreferrer">capstone</a></td><td>ML-11/12</td><td>This paper's figures 1&ndash;3, and the demo/summary cuts</td></tr>
+</tbody>
+</table>
+</div>
 
 <p>Every notebook is <strong>self-contained and order-independent</strong>: each resolves the repo root, loads the starter CSV, and rebuilds what it needs rather than depending on another notebook having been run. All ten were executed top to bottom through a real Jupyter kernel via <code>nbconvert --execute</code> and ship with their outputs stored, with an <code>execution_count</code> sequence of exactly 1..N &mdash; which is how a reader can tell each was a single clean pass rather than a patchwork of cells run out of order. Verified mechanically across the set: zero cell errors, zero <code>TODO</code> markers, and zero pseudonymous IDs in any stored output.</p>
 
@@ -517,7 +526,7 @@ pip install -r requirements.txt
 
 <h2 id="credit"><span class="num">9.</span>Acknowledgments &amp; data credit</h2>
 
-<p>Built on the <strong>FlyRank ML Internship dataset</strong> &mdash; <a href="https://flyrank.ai">flyrank.ai</a>. Thanks to the FlyRank team for the pseudonymized data release and the lane framing, and for shipping a data dictionary honest enough that the two places it disagrees with its own file were findable.</p>
+<p>Built on the <strong>FlyRank ML Internship dataset</strong> &mdash; <a href="https://flyrank.ai" target="_blank" rel="noopener noreferrer">flyrank.ai</a>. Thanks to the FlyRank team for the pseudonymized data release and the lane framing, and for shipping a data dictionary honest enough that the two places it disagrees with its own file were findable.</p>
 
 <footer>
   <p><strong>Claims standard applied throughout.</strong> Every statement on this page is <em>observed</em>, <em>measured</em>, <em>directional</em>, or <em>decision-support</em>. No causal claims &mdash; the dataset records no intervention. Nothing here models search-engine behaviour, and nothing here reads editorial quality. The base rate (0.5421) appears beside every precision figure. Small buckets are reported with their n. Uncertainty is quoted where the sample is small. No sealed-evaluation claim is made. Three results that run against the headline &mdash; the 0.152 AUC of client memorisation, the volume-not-decay importance profile, and the shipped queue's worse portfolio coverage &mdash; are reported <em>with</em> it rather than after it.</p>
