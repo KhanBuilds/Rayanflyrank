@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which pages should we refresh next? Ranking measured organic decline across 30,000 content items</title>
+<meta name="description" content="A capacity-constrained ranking model that orders 30,000 pseudonymized content items by measured organic decline. Precision@50 = 0.900 against a 0.542 base rate, evaluated on held-out clients.">
+<meta name="author" content="Rayan (KhanBuilds)">
+<meta property="og:title" content="Which pages should we refresh next?">
+<meta property="og:description" content="Ranking measured organic decline across 30,000 content items. Precision@50 = 0.900 against a 0.542 base rate, on a client-held-out split.">
+<meta property="og:type" content="article">
+<style>
+:root{
+  --bg:#fbfaf8; --surface:#ffffff; --ink:#1a1a1a; --ink-soft:#4a4a4a; --ink-faint:#767676;
+  --rule:#e2ded7; --rule-soft:#efece7;
+  --accent:#0b5c4a; --accent-soft:#e6f0ec;
+  --warn:#8a4b12; --warn-soft:#f7eee4;
+  --code-bg:#f3f1ec;
+  --figure-bg:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#131417; --surface:#191b1f; --ink:#eceae6; --ink-soft:#b6b3ad; --ink-faint:#8b8880;
+    --rule:#2e3138; --rule-soft:#24272c;
+    --accent:#5fcfae; --accent-soft:#16302a;
+    --warn:#e0a260; --warn-soft:#2d2418;
+    --code-bg:#22252a;
+    --figure-bg:#f6f5f2;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131417; --surface:#191b1f; --ink:#eceae6; --ink-soft:#b6b3ad; --ink-faint:#8b8880;
+  --rule:#2e3138; --rule-soft:#24272c;
+  --accent:#5fcfae; --accent-soft:#16302a;
+  --warn:#e0a260; --warn-soft:#2d2418;
+  --code-bg:#22252a;
+  --figure-bg:#f6f5f2;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  font-size:18px; line-height:1.65; overflow-x:hidden;
+}
+.wrap{max-width:47rem; margin:0 auto; padding:0 1.25rem 4rem}
+header.masthead{border-bottom:1px solid var(--rule); margin-bottom:2rem; padding:3.25rem 0 1.75rem}
+.kicker{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.72rem; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); font-weight:650; margin:0 0 1rem;
+}
+h1{font-size:clamp(1.8rem,5vw,2.6rem); line-height:1.16; margin:0 0 1rem; font-weight:600; letter-spacing:-.015em}
+.subtitle{font-size:1.1rem; color:var(--ink-soft); margin:0 0 1.6rem; line-height:1.5}
+.byline{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.85rem; color:var(--ink-faint); line-height:1.85; margin:0;
+}
+.byline a{color:var(--accent)}
+h2{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:1.3rem; font-weight:650; letter-spacing:-.01em;
+  margin:3rem 0 1rem; padding-top:1.2rem; border-top:1px solid var(--rule-soft);
+  scroll-margin-top:1rem;
+}
+h2 .num{color:var(--ink-faint); font-weight:500; margin-right:.5rem}
+h3{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:1rem; font-weight:650; margin:1.9rem 0 .6rem;
+}
+p{margin:0 0 1.05rem}
+a{color:var(--accent); text-decoration-thickness:1px; text-underline-offset:2px}
+strong{font-weight:650}
+ul,ol{margin:0 0 1.05rem; padding-left:1.3rem}
+li{margin-bottom:.5rem}
+code,kbd{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size:.85em; background:var(--code-bg); padding:.1em .35em; border-radius:3px; overflow-wrap:break-word}
+pre{background:var(--code-bg); padding:1rem 1.1rem; border-radius:6px; overflow-x:auto; font-size:.8rem; line-height:1.6; border:1px solid var(--rule-soft)}
+pre code{background:none; padding:0; font-size:1em}
+
+.abstract{
+  background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+  padding:1.5rem 1.6rem; margin:0 0 1rem;
+}
+.abstract h2{margin:0 0 .8rem; padding:0; border:none; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-faint)}
+.abstract p:last-child{margin-bottom:0}
+
+.headline{
+  display:flex; flex-wrap:wrap; gap:1px; background:var(--rule);
+  border:1px solid var(--rule); border-radius:8px; overflow:hidden; margin:1.75rem 0 2.25rem;
+}
+.headline div{flex:1 1 8.5rem; background:var(--surface); padding:.95rem 1.05rem}
+.headline .v{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:1.55rem; font-weight:600; letter-spacing:-.02em; display:block; line-height:1.15;
+}
+.headline .l{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.71rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.07em; margin-top:.3rem; display:block; line-height:1.4;
+}
+
+.tablewrap{overflow-x:auto; margin:0 0 .6rem; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; min-width:24rem;
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:.85rem}
+th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+thead th{border-bottom:1.5px solid var(--rule); font-weight:650; color:var(--ink-soft); white-space:nowrap}
+tbody tr.hl td{background:var(--accent-soft)}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+.tnote{font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.8rem; color:var(--ink-faint); margin:0 0 1.5rem; line-height:1.5}
+
+figure{margin:1.9rem 0 2.1rem}
+figure .plate{background:var(--figure-bg); border:1px solid var(--rule); border-radius:8px; padding:1rem; overflow-x:auto}
+figure img{display:block; width:100%; height:auto; max-width:100%}
+figcaption{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.82rem; color:var(--ink-soft); margin-top:.7rem; line-height:1.55;
+}
+figcaption b{color:var(--ink)}
+
+.callout{
+  border-left:3px solid var(--accent); background:var(--accent-soft);
+  padding:.9rem 1.1rem; border-radius:0 6px 6px 0; margin:1.5rem 0;
+  font-size:.95rem;
+}
+.callout.caution{border-left-color:var(--warn); background:var(--warn-soft)}
+.callout p:last-child{margin-bottom:0}
+.callout .tag{
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.7rem; letter-spacing:.11em; text-transform:uppercase; font-weight:650;
+  color:var(--accent); display:block; margin-bottom:.35rem;
+}
+.callout.caution .tag{color:var(--warn)}
+
+.toc{
+  background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+  padding:1.05rem 1.25rem; margin:0 0 2rem;
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-size:.85rem;
+}
+.toc b{display:block; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:.6rem}
+.toc ol{margin:0; padding-left:1.2rem; columns:2; column-gap:1.5rem}
+.toc li{margin-bottom:.3rem; break-inside:avoid}
+@media (max-width:34rem){ .toc ol{columns:1} body{font-size:17px} }
+
+footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:.82rem; color:var(--ink-faint); line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="kicker">FlyRank ML Internship &middot; Capstone &middot; Lane 2</p>
+  <h1>Which pages should we refresh next?</h1>
+  <p class="subtitle">Ranking measured organic decline across 30,000 content items, when editorial capacity is 50 slots a sprint and the base rate is already 54%.</p>
+  <p class="byline">
+    <strong>Rayan</strong> &nbsp;&middot;&nbsp; GitHub <a href="https://github.com/KhanBuilds">@KhanBuilds</a><br>
+    Repository: <a href="https://github.com/KhanBuilds/Rayanflyrank">KhanBuilds/Rayanflyrank</a> &nbsp;&middot;&nbsp; Data: FlyRank ML Internship starter release<br>
+    Published 2026-08-25 &middot; Analysis run 2026-08-16 &middot; Seed 42 throughout
+  </p>
+</header>
+
+<section class="abstract">
+  <h2>Abstract</h2>
+  <p>Among mature indexed content items with established search demand, which pages are undergoing measured organic decline and should be prioritised for editorial review in the coming sprint? The work uses the FlyRank internship starter dataset &mdash; 30,000 pseudonymized content items across 32 clients, one trailing 90-day window. I framed the task as capacity-constrained <strong>ranking</strong> rather than classification, committed to precision@50 against the 54.2% base rate before building anything, and built a transparent five-condition rule baseline with reason codes on every row; it reaches precision@50 = 0.740 in-sample and carries a self-diagnosed defect &mdash; its precision <em>rises</em> with K, so it finds a good band of candidates but orders that band backwards at the top, where the queue is actually read. Four models were then trained and compared on a client-held-out split (GroupKFold, 32 clients, zero overlap), with the baseline scored on identical rows; the shipped system is a <strong>hybrid</strong> in which the rule selects the band and supplies the reason codes while a logistic regression orders pages within it, reaching <strong>precision@50 = 0.900 against a 0.542 base rate</strong> &mdash; 45 of 50 review slots landing on pages measured as declining, versus 27 for random triage &mdash; and it is the only candidate whose precision falls monotonically from 1.000 at K=10. Three results run against that headline and are reported with it: a random row split inflates AUC by 0.152 over the grouped split (pure client memorisation), the model's top feature by a factor of 2.4 is impressions volume rather than anything resembling decay, and four of its five top-50 misses are pages that <em>grew</em> &mdash; the same failure the rule made. The output is a ranked review queue: decision support telling an editor which pages to open first, <strong>not</strong> a prediction that refreshing them recovers traffic.</p>
+</section>
+
+<div class="headline">
+  <div><span class="v">0.900</span><span class="l">precision@50, shipped hybrid</span></div>
+  <div><span class="v">0.542</span><span class="l">base rate it is measured against</span></div>
+  <div><span class="v">45/50</span><span class="l">slots on declining pages (random: 27)</span></div>
+  <div><span class="v">0.152</span><span class="l">AUC a random split would have gifted me</span></div>
+</div>
+
+<nav class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#problem">The decision this supports</a></li>
+    <li><a href="#data">Data, and what it does not contain</a></li>
+    <li><a href="#method">Methodology</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#evaluation">Validation and honest error bars</a></li>
+    <li><a href="#limits">Limitations</a></li>
+    <li><a href="#recommend">Ranked recommendations</a></li>
+    <li><a href="#repro">Reproducibility</a></li>
+    <li><a href="#credit">Acknowledgments &amp; data credit</a></li>
+  </ol>
+</nav>
+
+<h2 id="problem"><span class="num">1.</span>The decision this supports</h2>
+
+<p>A content strategist opens a sprint planning doc on a Monday. The portfolio has 30,000 published pages. Writer hours and optimisation budget cover about <strong>50</strong> of them. The question is not &ldquo;which pages are declining?&rdquo; &mdash; more than half of them are &mdash; it is <strong>which 50 to open first</strong>.</p>
+
+<p>That framing decides the metric. Fifty slots against 30,000 pages is <strong>0.17%</strong> of the portfolio, so this is a ranking problem, and the only figure that matches the decision is <strong>precision at the top of the ranking</strong>. Accuracy is the wrong instrument, and recall is close to meaningless: with 16,262 positive rows and 50 slots, the maximum achievable recall is <strong>0.31%</strong>.</p>
+
+<ul>
+  <li><strong>Unit of analysis:</strong> one pseudonymized content item (<code>content_id</code>). Grain verified in code &mdash; 30,000 rows, 30,000 distinct IDs, zero duplicates. <code>client_id</code> is used for grouping and splitting only, never as a feature.</li>
+  <li><strong>Output:</strong> a score per item, delivered as a ranked review queue with reason codes attached to every row.</li>
+  <li><strong>Action:</strong> the editor opens the top K pages (K &asymp; 20&ndash;50 per sprint) and either refreshes &mdash; updating out-of-date facts, realigning headers with current intent, expanding thin sections &mdash; or, having looked, deliberately skips.</li>
+  <li><strong>Cost of a wrong call, and why it is asymmetric:</strong> a false positive burns a slot worth roughly $300&ndash;$1,000 of editorial time on a stable page; a false negative leaves a decaying revenue page unreviewed while a competitor takes the position.</li>
+</ul>
+
+<h3>Why this needs a model at all</h3>
+
+<p>The industry-standard answer is a staleness rule: refresh what has not been touched in six months. Measured on this slice, that rule has almost nothing to fire on. Only <strong>174</strong> pages are more than 180 days stale, and only <strong>17</strong> are both &ge;180 days stale and carry &ge;500 impressions. A staleness-gated rule fills 17 of 50 slots and then tie-breaks arbitrarily.</p>
+
+<p>The signals that <em>do</em> exist are bands and interactions rather than thresholds. <code>days_with_impressions</code> rises from a 0.149 decline rate to 0.649 and then falls back. Position is an <strong>inverted U</strong>: top-3 pages decline least (0.241), positions 11&ndash;20 most (0.610). CTR carries signal only conditional on volume. Hand-tuning those bands is fitting the data with worse bookkeeping and no held-out check &mdash; so the argument here is not that ML is stronger, it is that <strong>ML is the honest way to fit what I would otherwise hand-tune</strong>. I built the hand-tuned rule anyway, so the model had a real bar to clear.</p>
+
+<h2 id="data"><span class="num">2.</span>Data, and what it does not contain</h2>
+
+<p><strong>Source.</strong> The FlyRank ML internship starter release: 30,000 rows &times; 44 columns, 32 pseudonymized clients, trailing-90-day metrics. The gated warehouse release was not used; where it would change a conclusion, that is stated as a limit rather than worked around. No client names, domains, URLs or raw search queries appear anywhere in this work, and no free text of any kind reaches the feature matrix.</p>
+
+<h3>There is no date column</h3>
+
+<p>Asserted in code, not assumed. Every time field is a relative offset from an unstated snapshot date, and three consequences follow that shape the whole project:</p>
+
+<ul>
+  <li>The two 30-day columns cover days 1&ndash;60; days 61&ndash;90 sit inside the 90-day totals and in neither 30-day window. <code>last_30d + prev_30d == impressions_90d</code> holds for only <strong>8.7%</strong> of rows.</li>
+  <li><code>days_with_impressions</code> caps at <strong>88</strong> while <code>days_with_sessions</code> reaches <strong>90</strong> &mdash; the Search Console reporting lag, visible in the data. The search and analytics windows are not the same length.</li>
+  <li><code>content_age_days</code> has a minimum of exactly <strong>90</strong>. The file was pre-filtered upstream to mature pages, which is why my own &ldquo;mature pages&rdquo; filter dropped nothing: <strong>the filter had already been applied before I received the file.</strong></li>
+</ul>
+
+<p>A time-aware split is therefore impossible from this file, and I say so rather than approximating one.</p>
+
+<h3>The leakage finding that changed the exclusion list</h3>
+
+<p>The data dictionary names two forbidden fields. The true set is four. The label is a &minus;20% threshold on the ratio of <code>impressions_last_30d</code> to <code>impressions_prev_30d</code>, so that pair reconstructs the label <strong>exactly &mdash; 1.0000 agreement</strong>.</p>
+
+<div class="callout caution">
+  <span class="tag">The part worth publishing</span>
+  <p>No single-feature screen would have caught it. <code>impressions_last_30d</code> scores ROC-AUC <strong>0.486</strong> on its own &mdash; it looks like the <em>least</em> informative column in the file &mdash; while <code>impressions_prev_30d</code> scores 0.621 and looks like an ordinary decent feature. A pipeline that ranks features univariately and drops the suspicious ones would have kept the weakest-looking column and produced a perfect, meaningless model. <strong>Leakage lives in how the label was defined, not in column names or univariate statistics.</strong></p>
+</div>
+
+<p>Twelve fields were excluded on that basis: the label source (<code>trend_direction</code>, <code>trend_pct</code>), the reconstruction pair, the four other last-vs-prev columns (measured agreement 0.536&ndash;0.538, i.e. <em>not</em> leaks, dropped anyway as weak and hard to defend in review), two generation-provenance flags describing which internal pipeline wrote a page, and the two IDs. That leaves <strong>32 feature fields</strong>, and the contract asserts in code that all 44 file columns plus the engineered label land in exactly one bucket, so it cannot silently drift from the file.</p>
+
+<h3>Four other validity traps, handled</h3>
+
+<ul>
+  <li><strong><code>avg_position = 0</code> means &ldquo;no data&rdquo;, not rank 1</strong> &mdash; 1,205 rows. Recoded to missing plus a <code>has_position_data</code> flag. Left as zero, those pages would look like the best-ranked content in the portfolio.</li>
+  <li><strong>Rate columns are &times;100 percentages</strong> (<code>ctr = 0.76</code> is 0.76%), and <code>scroll_rate</code> / <code>ai_traffic_pct</code> legitimately exceed 100 on 119 and 23 rows because numerator and denominator come from different systems. Not clipped.</li>
+  <li><strong>Missingness tracks content type, and content type tracks the label.</strong> <code>feedly article</code> is 100% missing <code>search_volume</code>/<code>competition</code>/<code>cpc</code>; label rates by type are 0.287 / 0.561 / 0.572. A blind <code>fillna(0)</code> would hand the model a proxy for &ldquo;this is a feedly article&rdquo; dressed up as a demand feature, so every gap gets an explicit <code>has_*</code> indicator.</li>
+  <li><strong>Split leakage.</strong> Pages within a client share templates, seasonality and tracking. Per-client label rates span <strong>0.000 to 0.937</strong>, and the three largest clients hold <strong>43.3%</strong> of rows. The split must be grouped by <code>client_id</code> &mdash; Section 5 prices exactly what ignoring that would have bought me.</li>
+</ul>
+
+<h2 id="method"><span class="num">3.</span>Methodology</h2>
+
+<h3>Label</h3>
+
+<p><code>is_declining_label = 1</code> when <code>trend_direction == "down"</code> &mdash; impressions fell more than 20% between the most recent 30 days and the 30 before. Base rate <strong>0.5421</strong> (16,262 of 30,000). Label and features are drawn from the same 90-day window, which makes this <strong>concurrent decline detection, not forecasting</strong>. The honest sentence is &ldquo;this page resembles the pages measured as declining&rdquo;, never &ldquo;this page will decline&rdquo;.</p>
+
+<h3>The rule baseline, built before any model</h3>
+
+<p>A transparent additive score &mdash; five readable conditions, no fitted weights, reason codes on every row:</p>
+
+<pre><code>3&times;established_coverage + 2&times;has_demand + 2&times;mid_position + 1&times;stale_90d + 1&times;mature_page</code></pre>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Condition</th><th class="n">Points</th><th>Plain reading</th></tr></thead>
+<tbody>
+<tr><td><code>20 &le; days_with_impressions &le; 87</code></td><td class="n">3</td><td>Real sustained coverage, but not showing every day.</td></tr>
+<tr><td><code>impressions_90d &ge; 40</code></td><td class="n">2</td><td>Enough demand for a refresh to be worth anything.</td></tr>
+<tr><td><code>3 &lt; avg_position &le; 50</code></td><td class="n">2</td><td>Findable but not already winning. Excludes the no-data zeros.</td></tr>
+<tr><td><code>days_since_last_update &ge; 90</code></td><td class="n">1</td><td>Not touched in a quarter.</td></tr>
+<tr><td><code>90 &le; content_age_days &lt; 365</code></td><td class="n">1</td><td>Settled, but still current.</td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">Ties break on <code>min(log1p(impressions_90d), 10)</code>. The rule reaches precision@50 = <strong>0.740</strong> in-sample, clearing the &ge;0.70 usefulness floor I committed to before building anything.</p>
+
+<h3>The defect the rule has, stated before the model was trained</h3>
+
+<p>Its precision <em>rises</em> with K &mdash; 0.750 @20, 0.740 @50, 0.800 @100, 0.835 @200 &mdash; which can only happen if the highest-ranked rows are worse than the rows below them. The three top-ranked pages in the queue all measured <strong>up</strong> (+54.4%, +68.5%, +35.2%): the tie-break sorts by traffic size, and the biggest pages here are the most stable. <strong>The rule finds a good band and does not rank within it.</strong> Reversing the tie-break is no better at the top and worse deeper, so I kept it and reported the flaw.</p>
+
+<figure>
+  <div class="plate"><img src="figures/fig1_label_rate_by_score.svg" alt="Bar chart of measured decline rate at each baseline rule score from 0 to 9, with the 0.542 base rate drawn as a horizontal reference line. The bars rise overall but dip at scores 7 and 1."></div>
+  <figcaption><b>Figure 1 &mdash; the rule separates, but it does not order.</b> Decline rate by baseline score against the 0.542 base rate. Score 9 reaches 71.4% over 2,990 pages, but the ladder is not monotone: score 7 (0.467, n=2,606) sits <em>below</em> score 6 (0.593, n=5,145), and score 1 (0.088, n=1,809) below score 0 (0.293, n=75). Five added opinions are not a calibrated ordering &mdash; which is precisely the job handed to the model.</figcaption>
+</figure>
+
+<h3>Models and the falsifiable test recorded in advance</h3>
+
+<p>Four candidates, listed in order of readability so a simple winner would be visible if it happened: logistic regression, a depth-3 decision tree, a random forest, and histogram gradient boosting. Each is used as a <strong>ranking score</strong> via <code>predict_proba</code>, never thresholded at 0.5. <strong>No hyperparameter search</strong> &mdash; library defaults plus two conservative variance guards, because an untuned model that wins is a cleaner claim than a tuned one that wins by tuning.</p>
+
+<p>The feature matrix is 38 columns from the 32 contract-approved fields: 29 numeric (including six <code>has_*</code> missing indicators) and 9 closed-vocabulary categoricals one-hot encoded <em>inside</em> the cross-validation loop, so a category appearing only in a test fold cannot influence the encoding. <code>avg_position == 0</code> is recoded to missing before anything else, and the heavy-tailed counts (skew 11&ndash;18) are <code>log1p</code>'d.</p>
+
+<div class="callout">
+  <span class="tag">The prediction, written down before training</span>
+  <p>The rule's defect was specific &mdash; good band, bad ordering inside it. So a model earns its place only if <strong>precision stops rising with K</strong>. Not &ldquo;if it scores higher&rdquo;: if the shape of the curve changes.</p>
+</div>
+
+<h2 id="results"><span class="num">4.</span>Results</h2>
+
+<p>All model figures are pooled out-of-fold on the client-held-out split. The base rate sits in the table so no number is read alone.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>System</th><th class="n">p@20</th><th class="n">p@50</th><th class="n">p@100</th><th class="n">p@200</th><th class="n">ROC-AUC</th></tr></thead>
+<tbody>
+<tr><td>Flag everything (floor)</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.500</td></tr>
+<tr><td>My rule baseline <span class="tnote" style="display:inline">(in-sample)</span></td><td class="n">0.750</td><td class="n">0.740</td><td class="n">0.800</td><td class="n"><strong>0.835</strong></td><td class="n">0.649</td></tr>
+<tr><td>Decision tree (depth 3)</td><td class="n">0.600</td><td class="n">0.600</td><td class="n">0.570</td><td class="n">0.600</td><td class="n">0.624</td></tr>
+<tr><td>Random forest</td><td class="n">0.550</td><td class="n">0.680</td><td class="n">0.740</td><td class="n">0.780</td><td class="n">0.681</td></tr>
+<tr><td>Histogram gradient boosting</td><td class="n">0.900</td><td class="n">0.820</td><td class="n">0.790</td><td class="n">0.800</td><td class="n"><strong>0.691</strong></td></tr>
+<tr><td>Logistic regression</td><td class="n">0.800</td><td class="n">0.880</td><td class="n">0.810</td><td class="n">0.805</td><td class="n">0.677</td></tr>
+<tr class="hl"><td><strong>Hybrid &mdash; rule band, logistic orders within it (shipped)</strong></td><td class="n"><strong>0.950</strong></td><td class="n"><strong>0.900</strong></td><td class="n"><strong>0.850</strong></td><td class="n">0.805</td><td class="n">0.661</td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">Receipt: <code>work/outputs/model_metrics.json</code>. The rule's thresholds were read off crosstabs computed on all 30,000 rows, so it is mildly in-sample while every model number is strictly out-of-fold &mdash; <strong>the comparison is tilted toward the baseline, not the model.</strong></p>
+
+<h3>The advance prediction was tested and held</h3>
+
+<figure>
+  <div class="plate"><img src="figures/fig2_precision_at_k.svg" alt="Line chart of precision at K for K = 10 through 500. The rule baseline curve climbs from 0.70 to a peak near 0.835 at K=200. The hybrid curve starts at 1.000 at K=10 and falls monotonically to 0.770 at K=500. A horizontal line marks the 0.542 base rate."></div>
+  <figcaption><b>Figure 2 &mdash; the finding, in one shape.</b> The rule's curve <em>climbs</em> (0.700 at K=10 &rarr; 0.835 at K=200): its best-ranked rows are its worst. The hybrid's falls monotonically from <strong>1.000 at K=10</strong> to 0.770 at K=500 &mdash; the ordering behaviour a queue needs, because a queue is read from the top. Only the hybrid passes the test recorded before training; plain logistic regression does not (0.700 at K=10, peaking at K=50), and neither does boosting cleanly.</figcaption>
+</figure>
+
+<h3>Two things I did not expect, reported because they are true</h3>
+
+<ol>
+  <li><strong>The readable model won, and only because of one feature decision.</strong> Logistic regression beat both tree ensembles at precision@50 &mdash; but <em>only</em> once the count columns were log-transformed. In an earlier run without that step it scored 0.660 and finished last. The lesson is not that linear models are underrated; it is that <strong>the feature-engineering decision mattered more than the choice of model</strong>, and I would have mis-attributed the result had I skipped it on the grounds that trees do not need it.</li>
+  <li><strong>The rule still wins at K=200</strong> (0.835 vs 0.805), and boosting wins at K=500. If editorial capacity were 200 pages a sprint rather than 50, my recommendation would change. The metric is only correct because the capacity is what it is.</li>
+</ol>
+
+<h2 id="evaluation"><span class="num">5.</span>Validation and honest error bars</h2>
+
+<h3>Why the split is grouped, priced in one number</h3>
+
+<p>Same model, same features, two splits:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Split</th><th class="n">ROC-AUC</th><th class="n">p@50</th></tr></thead>
+<tbody>
+<tr><td>Random 80/20 row split</td><td class="n"><strong>0.777</strong></td><td class="n">0.920</td></tr>
+<tr><td>Grouped, clients held out</td><td class="n"><strong>0.624</strong></td><td class="n">0.780</td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">A <strong>0.152 AUC gap of pure client memorisation.</strong> Per-client label rates span 0.000&ndash;0.937 across 32 clients and the three largest hold 43.3% of rows, so a random split mostly measures which client a page belongs to. This is the single easiest way to publish an inflated number on this dataset, and it is measured here rather than asserted.</p>
+
+<h3>Uncertainty, because precision@50 is a statement about 50 rows</h3>
+
+<p>One row moves it by 0.02. Bootstrapped 95% intervals on the selected set:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>System</th><th class="n">p@50</th><th class="n">95% interval</th></tr></thead>
+<tbody>
+<tr><td>Rule baseline</td><td class="n">0.740</td><td class="n">[0.620, 0.860]</td></tr>
+<tr><td>Logistic regression</td><td class="n">0.880</td><td class="n">[0.780, 0.960]</td></tr>
+<tr class="hl"><td>Hybrid (shipped)</td><td class="n">0.900</td><td class="n">[0.820, 0.980]</td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">The hybrid's interval and the rule's overlap only slightly. On one dataset and one 90-day window, the improvement is <strong>measured and directional, not established</strong>.</p>
+
+<h3>The fold spread argues the other way, and that is reported too</h3>
+
+<figure>
+  <div class="plate"><img src="figures/fig3_fold_spread.svg" alt="Chart showing precision at 50 measured separately inside each of the five held-out client folds, for each system, with mean markers. Logistic regression shows the widest spread and the lowest single fold at 0.560; the hybrid and gradient boosting sit highest and tightest."></div>
+  <figcaption><b>Figure 3 &mdash; two questions, two winners.</b> Pooled out-of-fold asks <em>&ldquo;rank the whole portfolio at once&rdquo;</em> &mdash; the hybrid wins (0.900). Per-fold asks <em>&ldquo;rank a group of clients this model has never seen&rdquo;</em> &mdash; gradient boosting wins on both mean (0.828) and worst fold (0.780), while plain logistic regression collapses to <strong>0.560</strong> on one fold, barely above the base rate. Part of that gap is a calibration artifact: pooling needs scores comparable <em>across</em> fold models, and logistic probabilities stack more cleanly than a tree ensemble's.</figcaption>
+</figure>
+
+<p>The hybrid is the compromise: second on both measures, with the band structure preventing any single fold model's mis-calibration from dragging a page into the top 50. <strong>If a future release shows the fold floor mattering more than the pooled top-50, the choice should flip to boosting</strong> &mdash; written down now rather than defended later.</p>
+
+<h3>My stated prior about the errors was wrong, in an instructive way</h3>
+
+<p>I predicted false positives would concentrate in high-impression pages and in low-volume pages. Neither is what happened. Four of the hybrid's five top-50 misses are pages that <em>grew</em> (+23.6% to +93.7%) &mdash; the direction I predicted &mdash; but they span 84 to 1,593 impressions, so volume is not the shared trait. <strong>What they share is position: every miss sits at <code>avg_position</code> 4.1&ndash;10.5, i.e. page one.</strong> The model cannot separate a healthy page-1 page from a decaying one &mdash; the same blind spot the signal audit found from the other direction, where top-3 pages decline <em>least</em> of any band (0.241 against a 0.542 base rate). Strong position is genuinely ambiguous evidence in this data, and my prior pointed at the wrong axis.</p>
+
+<h3>The leak-injection test found something I did not plan for</h3>
+
+<p>The verification step is to inject a known leak and confirm the harness catches it. Adding the two forbidden columns back moves out-of-fold AUC from 0.677 to <strong>0.920 as raw counts</strong> &mdash; but to <strong>0.9996 in log space</strong>. Same two columns, same model, an 0.08 AUC difference. The reason is that the label is a threshold on a <em>ratio</em>, which is linear in logs and not in raw counts, so a linear model can only fully exploit the leak when the representation matches the label's functional form.</p>
+
+<div class="callout">
+  <span class="tag">Generalisable lesson</span>
+  <p><strong>Leakage is a property of <em>(column, representation, model)</em>, not of a column.</strong> A screen that evaluates columns before deciding how they will be transformed can under-state a leak by exactly the margin that later gets waved through as &ldquo;the model is just a bit good&rdquo;.</p>
+</div>
+
+<h3>Applying the same standard to the published research</h3>
+
+<p>I audited two findings from <em>The State of AI-Driven SEO</em> (March 2026) with the questions I ask of my own work. Its methodology page is more careful than most published SEO research &mdash; it names its confounders, flags its own unstable buckets, and states plainly that the study is observational. Both issues below are places where the paper contradicts either itself or the dataset it shipped with, so both are checkable in code rather than matters of taste.</p>
+
+<ol>
+  <li><strong>&ldquo;Refreshing mature pages produces 3.2&times; health and 57&times; impressions&rdquo; is causal language on an observational comparison</strong> &mdash; and the paper's own methodology page forbids it. The mechanism is selection: nobody refreshes pages at random, so part of that 57&times; is <em>which pages were chosen</em>. There is also a definitional loop, since Health Score is 30 points impressions + 30 position + 20 CTR + 20 scroll, so 60 of its 100 points are search performance. The fix needs no new data, only different words: <em>&ldquo;mature pages refreshed in the last 30 days show 57&times; the impressions of those that were not.&rdquo;</em></li>
+  <li><strong>&ldquo;Logistic regression, 71% holdout accuracy&rdquo; is reported with no base rate, on an ungrouped 80/20 split across 57 brands.</strong> A majority-class classifier on the paper's own counts scores <strong>62.1%</strong> for free, so 71% is roughly 9 points of skill. And I can price the ungrouped split precisely, because I ran the identical experiment: on this data it is worth <strong>0.152 AUC</strong>, while my own genuine skill above chance is 0.124. <strong>The memorisation available from an ungrouped split is larger than the signal.</strong></li>
+  <li><strong>The paper and its own dataset disagree on the definition of the variable both findings rest on.</strong> Page 5 defines Trend Direction as &plusmn;10%; the shipped data dictionary says &plusmn;20%. The data follows &plusmn;20%, verified by reading the actual class boundaries. A reader rebuilding the cohorts at &plusmn;10% would reclassify <strong>1,935 rows in this 30,000-row slice alone</strong> and would not know why their reproduction failed.</li>
+</ol>
+
+<p>The two objections I raised are the two I am most at risk of committing &mdash; which is why Section 5 is my answer to the split objection, measured on my own model at my own cost, and why the base rate appears beside every precision figure on this page.</p>
+
+<h2 id="limits"><span class="num">6.</span>Limitations &mdash; what this work cannot claim</h2>
+
+<ul>
+  <li><strong>Not a forecast.</strong> Label and features come from the same 90-day window. This detects pages that <em>resemble</em> pages measured as declining. It does not say a page will decline.</li>
+  <li><strong>Not causal.</strong> The dataset records no intervention, so nothing here establishes that refreshing a page recovers traffic. The queue tells an editor what to open, not what will happen.</li>
+  <li><strong>Not a sealed evaluation.</strong> Cross-validation on held-out clients is an honest out-of-sample estimate, not a blind test: every fold's data was visible to me while working, and I chose the shipped configuration after seeing fold results. No metrics file in the repo claims otherwise.</li>
+  <li><strong>The model ranks partly by exposure, not decay.</strong> Permutation importance over the five held-out folds puts <code>impressions_90d</code> at an 0.119 AUC drop &mdash; <strong>2.4&times;</strong> the next feature (<code>clicks_90d</code>, 0.050), with <code>avg_position</code> at 0.028 the only non-volume feature near the top. I flagged this risk in writing before training and it reproduced. A system whose two strongest signals are exposure and position has no way to tell a well-performing page-1 page from a decaying one &mdash; which is exactly where its top-50 misses land.</li>
+  <li><strong>One contamination check it cannot fully pass.</strong> The label lives in days 1&ndash;60 of the window; several features are 90-day aggregates <em>containing</em> those days. Three things stop that being fatal &mdash; the overlap is of magnitude not identity (<code>impressions_90d</code> alone scores AUC 0.585, and a 90-day sum cannot express a direction), the task is framed as concurrent detection, and a clean version needs day-61&ndash;90 features this file cannot produce. It is disclosed rather than passed.</li>
+  <li><strong>Coefficients are not interpretable one at a time.</strong> The fit carries +1.18 on <code>impressions_90d</code> while carrying &minus;0.62 on <code>clicks_90d</code> and &minus;0.59 on <code>users_90d</code>. Those columns are strongly collinear, so the fit has split one signal across several columns and the sign of any single coefficient is not a statement about the world.</li>
+  <li><strong>697 pages cannot be ranked at all.</strong> On <code>comparison article</code> rows the measured AUC is 0.524 &mdash; chance. Per-type skill in this portfolio spans 0.524 to 0.843.</li>
+  <li><strong>Engagement-rate signals are unproven here, and that is itself a finding.</strong> 21,629 of 30,000 pages have <code>engagement_rate == 0</code> and 99% of visible pages fall in a single band; the smallest bucket has n=3. Any rule keyed on engagement bands fires on noise. This is an <em>instrumentation gap</em>, not a content problem &mdash; it says where not to spend the next measurement effort.</li>
+  <li><strong>Scope.</strong> One 90-day snapshot, 32 pseudonymized clients, one portfolio. Tree-ensemble precision@K can move a point or two between library versions; <strong>the direction of the precision curve is the finding, not the third decimal.</strong></li>
+</ul>
+
+<h2 id="recommend"><span class="num">7.</span>Ranked recommendations</h2>
+
+<p>Every row of the shipped queue is a <strong>review</strong> recommendation. The system never recommends publishing a change &mdash; only opening a page. All 50 rows of the shipped top-50 sit at baseline score 9, meaning all five rule conditions fired on every one of them, so each recommendation still arrives with the same auditable explanation the rule gave; the model changed only the order, which is precisely the part the rule was measured to get wrong.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Reason-code pattern</th><th>Action</th><th>Confidence</th><th>Limit</th></tr></thead>
+<tbody>
+<tr class="hl"><td>All five codes, model-ranked top 50</td><td><strong>Refresh review</strong></td><td>Medium-high &mdash; 45 of 50 measured declining (0.900 vs 0.542)</td><td>Off-season intent looks identical; no seasonality field exists to rule it out</td></tr>
+<tr><td>All five codes, <strong>page-1 position</strong> (<code>avg_position</code> &lt; 11)</td><td>Refresh review, <strong>but verify direction first</strong></td><td>Medium &mdash; this is where every measured error sits</td><td>4 of the 5 top-50 misses are page-1 pages that <em>grew</em> (+23.6% to +93.7%)</td></tr>
+<tr><td>Any <code>comparison article</code></td><td>Do not trust the rank</td><td>None &mdash; measured AUC 0.524</td><td>697 pages the model cannot order at all</td></tr>
+<tr><td><code>established_coverage</code> + <code>has_demand</code>, no <code>stale_90d</code></td><td>Monitor</td><td>Low-medium</td><td>Recently updated; a second refresh is unlikely to be the lever</td></tr>
+<tr><td>Missing <code>mid_position</code> (top-3, or no position data)</td><td>Deprioritise</td><td>Medium</td><td><code>top_3</code> declines least (0.241); <code>avg_position == 0</code> means no reading at all</td></tr>
+<tr><td><code>no_signal</code></td><td>Leave alone</td><td>&mdash;</td><td>75 pages, declining rate 0.293 &mdash; below the base rate</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>The operational layer turns each measured failure into a guardrail</h3>
+
+<figure>
+  <div class="plate"><img src="figures/fig4_playbook_funnel.svg" alt="Funnel chart from the top 50 ranked pages down to 27 sendable pages, showing 23 rows deferred by the per-client cap, with the largest client's share falling from 58 percent to 30 percent."></div>
+  <figcaption><b>Figure 4 &mdash; better ranking, worse portfolio coverage.</b> The hybrid's top 50 spans only <strong>7 of 32 clients, with one supplying 58%</strong> (against the rule's 44%) &mdash; a regression the precision metric cannot see. An 8-page-per-client cap defers 23 rows and cuts the largest client's share to <strong>30%</strong>, leaving a sendable set of <strong>27 pages</strong>. That set measures 0.926 declining, but <strong>that number is not model performance</strong>: it is what a human decision layered on the ranking produced. The rules remove slots; they do not remove errors.</figcaption>
+</figure>
+
+<h3>What an editor would do tomorrow</h3>
+
+<ol>
+  <li>Take the top 50 rows of the ranked queue, sorted by <code>hybrid_score</code>, with the <code>action</code> column already applied.</li>
+  <li><strong>Sanity-check the page-1 rows before assigning them.</strong> Every measured false positive in the top 50 sits at <code>avg_position</code> 4.1&ndash;10.5 and is <em>growing</em>. Strong position is ambiguous evidence in this data, and this is the failure mode that survived from the rule into the model.</li>
+  <li><strong>Cap at ~8 pages per client</strong> &mdash; this matters more for the shipped queue than for the rule it replaces.</li>
+  <li><strong>Drop <code>comparison article</code> rows entirely</strong> until there is a model that can rank them.</li>
+  <li>Review the remainder by hand; the reason codes say what to look at first.</li>
+  <li><strong>Log every decision (refreshed / skipped / monitored) with a date.</strong></li>
+</ol>
+
+<h3>What would tell us this has gone stale</h3>
+
+<p>Each trigger carries a reference value measured from this build, so drift is a comparison rather than a feeling. <strong>Tier 1, every sprint:</strong> base rate outside 0.45&ndash;0.65; realised precision@50 below <strong>0.70</strong> &mdash; the usefulness floor committed to before anything was built &mdash; for two consecutive sprints; the largest client exceeding 40% of the sendable set, meaning the cap has stopped working. <strong>Tier 3, immediate refit:</strong> any change to the &plusmn;20% label threshold (not hypothetical &mdash; FlyRank's own published research documents that same field as &plusmn;10%), and any new client onboarded, whose queue should be withheld until history exists, because the measured cost of an unseen client is 0.152 AUC.</p>
+
+<div class="callout caution">
+  <span class="tag">The cheapest high-value next step</span>
+  <p>Every Tier-1 trigger except the base rate needs to know what the editor actually did, and no such record exists. The whole monitoring plan is blocked on a <strong>three-column decision log: <code>content_id</code>, <code>decision</code>, <code>date</code></strong>. It is also the only route to the causal question this work cannot currently answer &mdash; and the only way to build a genuine past&rarr;future label next quarter.</p>
+</div>
+
+<h2 id="repro"><span class="num">8.</span>Reproducibility</h2>
+
+<p><code>RANDOM_STATE = 42</code> in every notebook &mdash; split, every model, and the bootstrap. The run behind Sections 4&ndash;6 used <strong>scikit-learn 1.9.0, pandas 3.0.1, numpy 2.4.0</strong>, printed by the notebook's own setup cell. Every estimator is <code>clone()</code>d per fold, so no fitted state is shared between folds &mdash; worth stating, because <code>sklearn.pipeline.Pipeline</code> does not clone its final estimator and reusing one silently produces a model fitted on the wrong fold.</p>
+
+<pre><code>git clone https://github.com/KhanBuilds/Rayanflyrank
+cd Rayanflyrank
+pip install -r requirements.txt
+# then run, in order:
+#   work/notebooks/w01_research_question.ipynb      (ML-02)
+#   work/notebooks/w02_ml_task_framing.ipynb        (ML-03)
+#   work/notebooks/w03_data_contract.ipynb          (ML-04)
+#   work/notebooks/w03_feature_leakage_check.ipynb  (ML-05)
+#   work/notebooks/w04_signal_audit.ipynb           (ML-06)
+#   work/notebooks/w04_baseline_score.ipynb         (ML-07)
+#   work/notebooks/w05_model.ipynb                  (ML-08)  ~8-10 min
+#   work/notebooks/w06_validation_audit.ipynb       (ML-09)
+#   work/notebooks/w07_action_playbook.ipynb        (ML-10)
+#   work/notebooks/capstone.ipynb                   (ML-11/12)</code></pre>
+
+<p>Every notebook is <strong>self-contained and order-independent</strong>: each resolves the repo root, loads the starter CSV, and rebuilds what it needs rather than depending on another notebook having been run. All ten were executed top to bottom through a real Jupyter kernel via <code>nbconvert --execute</code> and ship with their outputs stored, with an <code>execution_count</code> sequence of exactly 1..N &mdash; which is how a reader can tell each was a single clean pass rather than a patchwork of cells run out of order. Verified mechanically across the set: zero cell errors, zero <code>TODO</code> markers, and zero pseudonymous IDs in any stored output.</p>
+
+<p><strong>Receipts.</strong> Every number on this page traces to one of three committed metrics files &mdash; <code>work/outputs/baseline_metrics.json</code> (Section 3, with its own honesty note in the <code>evaluation</code> field), <code>work/outputs/model_metrics.json</code> (Sections 4&ndash;6, including a <code>known_failure_mode</code> field recording the growing-page misses), and <code>work/outputs/playbook_metrics.json</code> (Section 7). Each downstream notebook <em>asserts</em> its numbers against the receipt upstream of it rather than quoting them, so a stale artifact breaks the run instead of quietly flattering the report. The ranked-queue CSVs are deliberately gitignored &mdash; datasets never enter git; the metrics JSONs are the committed trace instead.</p>
+
+<p><a href="https://github.com/KhanBuilds/Rayanflyrank">Full repository, notebooks and receipts &rarr;</a> &nbsp;&middot;&nbsp; <a href="https://github.com/KhanBuilds/Rayanflyrank/blob/main/work/capstone_report.md">Long-form capstone report &rarr;</a></p>
+
+<h2 id="credit"><span class="num">9.</span>Acknowledgments &amp; data credit</h2>
+
+<p>Built on the <strong>FlyRank ML Internship dataset</strong> &mdash; <a href="https://flyrank.ai">flyrank.ai</a>. Thanks to the FlyRank team for the pseudonymized data release and the lane framing, and for shipping a data dictionary honest enough that the two places it disagrees with its own file were findable.</p>
+
+<footer>
+  <p><strong>Claims standard applied throughout.</strong> Every statement on this page is <em>observed</em>, <em>measured</em>, <em>directional</em>, or <em>decision-support</em>. No causal claims &mdash; the dataset records no intervention. Nothing here models search-engine behaviour, and nothing here reads editorial quality. The base rate (0.5421) appears beside every precision figure. Small buckets are reported with their n. Uncertainty is quoted where the sample is small. No sealed-evaluation claim is made. Three results that run against the headline &mdash; the 0.152 AUC of client memorisation, the volume-not-decay importance profile, and the shipped queue's worse portfolio coverage &mdash; are reported <em>with</em> it rather than after it.</p>
+  <p>&copy; 2026 Rayan &middot; <a href="https://github.com/KhanBuilds/Rayanflyrank">KhanBuilds/Rayanflyrank</a> &middot; Code and text released under the repository's licence.</p>
+</footer>
+
+</div>
+</body>
+</html>
