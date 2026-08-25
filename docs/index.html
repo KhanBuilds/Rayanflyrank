@@ -208,7 +208,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 
 <h2 id="data"><span class="num">2.</span>Data, and what it does not contain</h2>
 
-<p><strong>Source.</strong> The FlyRank ML internship starter release: 30,000 rows &times; 44 columns, 32 pseudonymized clients, trailing-90-day metrics. The gated warehouse release was not used; where it would change a conclusion, that is stated as a limit rather than worked around. No client names, domains, URLs or raw search queries appear anywhere in this work, and no free text of any kind reaches the feature matrix.</p>
+<p><strong>Source.</strong> One table &mdash; the FlyRank ML internship starter release, <code>data/raw/content_refresh_anonymized.csv</code>: 30,000 rows &times; 44 columns, 32 pseudonymized clients, trailing-90-day metrics. The gated ~79M-row warehouse release was not used; where it would change a conclusion, that is stated as a limit rather than worked around. No client names, domains, URLs or raw search queries appear anywhere in this work, and no free text of any kind reaches the feature matrix.</p>
 
 <h3>There is no date column</h3>
 
@@ -315,6 +315,18 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
   <figcaption><b>Figure 2 &mdash; the finding, in one shape.</b> The rule's curve <em>climbs</em> (0.700 at K=10 &rarr; 0.835 at K=200): its best-ranked rows are its worst. The hybrid's falls monotonically from <strong>1.000 at K=10</strong> to 0.770 at K=500 &mdash; the ordering behaviour a queue needs, because a queue is read from the top. Only the hybrid passes the test recorded before training; plain logistic regression does not (0.700 at K=10, peaking at K=50), and neither does boosting cleanly.</figcaption>
 </figure>
 
+<div class="tablewrap">
+<table>
+<thead><tr><th>Table view of Figure 2 &mdash; precision@K</th><th class="n">10</th><th class="n">20</th><th class="n">50</th><th class="n">100</th><th class="n">200</th><th class="n">500</th></tr></thead>
+<tbody>
+<tr><td>Rule baseline (in-sample)</td><td class="n">0.700</td><td class="n">0.750</td><td class="n">0.740</td><td class="n">0.800</td><td class="n">0.835</td><td class="n">0.808</td></tr>
+<tr class="hl"><td>Hybrid (shipped, out-of-fold)</td><td class="n"><strong>1.000</strong></td><td class="n">0.950</td><td class="n">0.900</td><td class="n">0.850</td><td class="n">0.805</td><td class="n">0.770</td></tr>
+<tr><td>Base rate</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td><td class="n">0.542</td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">A figure should never be the only way to read a number &mdash; so every chart on this page has its values in text beside it.</p>
+
 <h3>Two things I did not expect, reported because they are true</h3>
 
 <ol>
@@ -358,9 +370,24 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 <h3>The fold spread argues the other way, and that is reported too</h3>
 
 <figure>
-  <div class="plate"><img src="figures/fig3_fold_spread.svg" alt="Chart showing precision at 50 measured separately inside each of the five held-out client folds, for each system, with mean markers. Logistic regression shows the widest spread and the lowest single fold at 0.560; the hybrid and gradient boosting sit highest and tightest."></div>
+  <div class="plate"><img src="figures/fig3_fold_spread.svg" alt="Dot plot with one row per system. Each row shows that system's five per-fold precision-at-50 values as dots joined by a range line, with a vertical tick marking its worst fold, against a dashed 0.542 base-rate line. The hybrid and gradient boosting rows are highlighted; logistic regression's worst fold sits furthest left at 0.560."></div>
   <figcaption><b>Figure 3 &mdash; two questions, two winners.</b> Pooled out-of-fold asks <em>&ldquo;rank the whole portfolio at once&rdquo;</em> &mdash; the hybrid wins (0.900). Per-fold asks <em>&ldquo;rank a group of clients this model has never seen&rdquo;</em> &mdash; gradient boosting wins on both mean (0.828) and worst fold (0.780), while plain logistic regression collapses to <strong>0.560</strong> on one fold, barely above the base rate. Part of that gap is a calibration artifact: pooling needs scores comparable <em>across</em> fold models, and logistic probabilities stack more cleanly than a tree ensemble's.</figcaption>
 </figure>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Table view of Figure 3 &mdash; p@50 per held-out fold</th><th class="n">1</th><th class="n">2</th><th class="n">3</th><th class="n">4</th><th class="n">5</th><th class="n">mean</th><th class="n">worst</th></tr></thead>
+<tbody>
+<tr><td>Decision tree (d3)</td><td class="n">0.50</td><td class="n">0.60</td><td class="n">0.58</td><td class="n">0.72</td><td class="n">0.70</td><td class="n">0.620</td><td class="n">0.50</td></tr>
+<tr><td>Logistic regression</td><td class="n">0.82</td><td class="n">0.84</td><td class="n">0.56</td><td class="n">0.74</td><td class="n">0.88</td><td class="n">0.768</td><td class="n">0.56</td></tr>
+<tr><td>Random forest</td><td class="n">0.78</td><td class="n">0.92</td><td class="n">0.84</td><td class="n">0.66</td><td class="n">0.66</td><td class="n">0.772</td><td class="n">0.66</td></tr>
+<tr><td>Rule baseline</td><td class="n">0.72</td><td class="n">0.78</td><td class="n">0.78</td><td class="n">0.96</td><td class="n">0.68</td><td class="n">0.784</td><td class="n">0.68</td></tr>
+<tr class="hl"><td>Hybrid (shipped)</td><td class="n">0.84</td><td class="n">0.92</td><td class="n">0.74</td><td class="n">0.84</td><td class="n">0.76</td><td class="n">0.820</td><td class="n">0.74</td></tr>
+<tr><td>Gradient boosting</td><td class="n">0.92</td><td class="n">0.78</td><td class="n">0.78</td><td class="n">0.86</td><td class="n">0.80</td><td class="n"><strong>0.828</strong></td><td class="n"><strong>0.78</strong></td></tr>
+</tbody>
+</table>
+</div>
+<p class="tnote">Folds are groups of clients, not rows. Base rate 0.542 throughout.</p>
 
 <p>The hybrid is the compromise: second on both measures, with the band structure preventing any single fold model's mis-calibration from dragging a page into the top 50. <strong>If a future release shows the fold floor mattering more than the pooled top-50, the choice should flip to boosting</strong> &mdash; written down now rather than defended later.</p>
 
@@ -399,6 +426,7 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
   <li><strong>One contamination check it cannot fully pass.</strong> The label lives in days 1&ndash;60 of the window; several features are 90-day aggregates <em>containing</em> those days. Three things stop that being fatal &mdash; the overlap is of magnitude not identity (<code>impressions_90d</code> alone scores AUC 0.585, and a 90-day sum cannot express a direction), the task is framed as concurrent detection, and a clean version needs day-61&ndash;90 features this file cannot produce. It is disclosed rather than passed.</li>
   <li><strong>Coefficients are not interpretable one at a time.</strong> The fit carries +1.18 on <code>impressions_90d</code> while carrying &minus;0.62 on <code>clicks_90d</code> and &minus;0.59 on <code>users_90d</code>. Those columns are strongly collinear, so the fit has split one signal across several columns and the sign of any single coefficient is not a statement about the world.</li>
   <li><strong>697 pages cannot be ranked at all.</strong> On <code>comparison article</code> rows the measured AUC is 0.524 &mdash; chance. Per-type skill in this portfolio spans 0.524 to 0.843.</li>
+  <li><strong>One of my own findings was overturned by my own audit.</strong> Early on I recorded CTR as a negative result &mdash; 0.507&ndash;0.578 across quintiles, essentially flat. That was measured on the wrong population: <strong>13,212 rows have <code>ctr == 0</code></strong>, overwhelmingly tiny pages where the ratio has no content. Among <em>visible</em> pages the signal is clean and monotone, 0.677 at CTR &le; 0.10 falling to 0.460 above 1.0. I corrected the earlier notebook rather than leave two contradictory statements in the repo. The lesson that mattered for the model: <strong>CTR carries signal only in interaction with volume</strong> &mdash; which a threshold cannot express, and which is part of the case for fitting rather than hand-tuning.</li>
   <li><strong>Engagement-rate signals are unproven here, and that is itself a finding.</strong> 21,629 of 30,000 pages have <code>engagement_rate == 0</code> and 99% of visible pages fall in a single band; the smallest bucket has n=3. Any rule keyed on engagement bands fires on noise. This is an <em>instrumentation gap</em>, not a content problem &mdash; it says where not to spend the next measurement effort.</li>
   <li><strong>Scope.</strong> One 90-day snapshot, 32 pseudonymized clients, one portfolio. Tree-ensemble precision@K can move a point or two between library versions; <strong>the direction of the precision curve is the finding, not the third decimal.</strong></li>
 </ul>
@@ -424,9 +452,23 @@ footer{border-top:1px solid var(--rule); margin-top:3rem; padding-top:1.4rem;
 <h3>The operational layer turns each measured failure into a guardrail</h3>
 
 <figure>
-  <div class="plate"><img src="figures/fig4_playbook_funnel.svg" alt="Funnel chart from the top 50 ranked pages down to 27 sendable pages, showing 23 rows deferred by the per-client cap, with the largest client's share falling from 58 percent to 30 percent."></div>
-  <figcaption><b>Figure 4 &mdash; better ranking, worse portfolio coverage.</b> The hybrid's top 50 spans only <strong>7 of 32 clients, with one supplying 58%</strong> (against the rule's 44%) &mdash; a regression the precision metric cannot see. An 8-page-per-client cap defers 23 rows and cuts the largest client's share to <strong>30%</strong>, leaving a sendable set of <strong>27 pages</strong>. That set measures 0.926 declining, but <strong>that number is not model performance</strong>: it is what a human decision layered on the ranking produced. The rules remove slots; they do not remove errors.</figcaption>
+  <div class="plate"><img src="figures/fig4_playbook_funnel.svg" alt="Bar chart of the share measured as declining at four stages of the queue: whole portfolio, top 50 by model rank, after removals, and sent to an editor. Each bar is labelled with its rate and page count, against a dashed 0.542 base-rate line. The bars barely rise after the top-50 stage while the page counts fall sharply."></div>
+  <figcaption><b>Figure 4 &mdash; the rules remove slots, not errors.</b> Decline rate at each stage from the whole portfolio (0.542, n=30,000) to what an editor actually receives, with the page count on every bar. Precision barely moves after the ranking has done its work &mdash; the removal stage costs nothing at all here, because no <code>comparison article</code> reached the top 50 &mdash; and what changes is <em>how many</em> pages survive. The filtering buys coverage and safety, not accuracy &mdash; which is why the raw and filtered numbers are drawn side by side rather than the filtered one being reported alone.</figcaption>
 </figure>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Table view of Figure 4</th><th class="n">Pages</th><th class="n">Share declining</th></tr></thead>
+<tbody>
+<tr><td>Whole portfolio</td><td class="n">30,000</td><td class="n">0.542</td></tr>
+<tr><td>Top 50 by model rank</td><td class="n">50</td><td class="n">0.900</td></tr>
+<tr><td>After removals (comparison articles)</td><td class="n">50</td><td class="n">0.900</td></tr>
+<tr class="hl"><td>Sent to an editor</td><td class="n">27</td><td class="n">0.926</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><strong>The cap is doing something the precision metric cannot see.</strong> The hybrid's top 50 spans only <strong>7 of 32 clients, with one supplying 58%</strong> of the slots &mdash; worse portfolio coverage than the rule it replaces (44%). An 8-page-per-client cap defers 23 rows and cuts the largest client's share to <strong>30%</strong>, leaving 27 sendable pages. That set measures 0.926 declining, but <strong>that number is not model performance</strong> &mdash; it is what a human decision layered on the ranking produced, and the two must never be conflated.</p>
 
 <h3>What an editor would do tomorrow</h3>
 
